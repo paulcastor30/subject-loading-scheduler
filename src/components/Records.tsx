@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import {
   days,
   labels,
@@ -11,6 +11,14 @@ import {
 } from "../lib/model";
 import type { Commit } from "../lib/useStore";
 import { Empty, ErrorMessage, Field, Reference } from "./UI";
+import { RecordChangeReview } from "./RecordChangeReview";
+import {
+  applyRecordChange,
+  planRecordChange,
+  recordDescription,
+  type ChangePlan,
+  type RecordAction,
+} from "../lib/recordChanges";
 const human = (s: string) =>
   s
     .replace(/Id$/, "")
@@ -338,7 +346,13 @@ export function Records({
     [editing, setEditing] = useState<
       Record<string, unknown> | null | undefined
     >(),
-    [search, setSearch] = useState("");
+    [search, setSearch] = useState(""),
+    [selected, setSelected] = useState<string[]>([]),
+    [plan, setPlan] = useState<ChangePlan | null>(null),
+    [busy, setBusy] = useState(false),
+    [message, setMessage] = useState(""),
+    [error, setError] = useState("");
+  const returnFocus = useRef<HTMLElement | null>(null);
   const singleton = ["workloadRules", "schedulingRules"].includes(entity);
   const fields = Object.keys(schemas[entity].shape).filter((f) => f !== "id");
   const rows = (data[entity] as unknown as Record<string, unknown>[]).filter(
@@ -364,16 +378,50 @@ export function Records({
     }
     return false;
   }
-  async function remove(id: unknown) {
-    if (
-      !confirm(
-        "Delete this record? Records referenced elsewhere cannot be deleted. You can undo this change.",
-      )
-    )
-      return;
-    const next = structuredClone(data);
-    (next[entity] as unknown[]) = next[entity].filter((r) => r.id !== id);
-    await commit(next, `Deleted ${labels[entity].toLowerCase()} record`);
+  function review(action: RecordAction, ids: string[]) {
+    returnFocus.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    setError("");
+    setMessage("");
+    setEditing(undefined);
+    setPlan(planRecordChange(data, { action, entity, ids }));
+  }
+  function closeReview() {
+    setPlan(null);
+    returnFocus.current?.focus();
+  }
+  async function applyChange() {
+    if (!plan || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const next = applyRecordChange(data, plan);
+      const count =
+        plan.request.action === "delete"
+          ? plan.removed.length
+          : plan.changed.length;
+      if (
+        await commit(
+          next,
+          `${plan.request.action === "delete" ? "Deleted" : plan.request.action === "reset" ? "Reset" : plan.request.action === "deactivate" ? "Deactivated" : "Activated"} ${count} records · ${labels[entity]}`,
+        )
+      ) {
+        setMessage(
+          `${plan.request.action === "delete" ? "Deleted" : plan.request.action === "reset" ? "Reset" : plan.request.action === "deactivate" ? "Deactivated" : "Activated"} ${count} ${count === 1 ? "record" : "records"}. You can undo this change during this session.`,
+        );
+        setSelected([]);
+        setPlan(null);
+        setEditing(undefined);
+      }
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "Unable to save these changes.",
+      );
+    } finally {
+      setBusy(false);
+    }
   }
   return (
     <>
@@ -381,10 +429,15 @@ export function Records({
         <Field label="Record type">
           <select
             value={entity}
+            disabled={busy}
             onChange={(e) => {
               setEntity(e.target.value as Entity);
               setEditing(undefined);
               setSearch("");
+              setSelected([]);
+              setPlan(null);
+              setMessage("");
+              setError("");
             }}
           >
             {Object.entries(labels).map(([key, label]) => (
@@ -397,17 +450,64 @@ export function Records({
         <Field label="Search records">
           <input
             type="search"
+            disabled={busy}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search any field…"
           />
         </Field>
         {!singleton && (
-          <button className="primary" onClick={() => setEditing(null)}>
+          <button
+            className="primary"
+            disabled={busy}
+            onClick={() => {
+              setPlan(null);
+              setEditing(null);
+            }}
+          >
             + Add record
           </button>
         )}
       </div>
+      {!singleton && selected.length > 0 && (
+        <div className="toolbar wrap selection-toolbar">
+          <strong>{selected.length} selected</strong>
+          <button
+            disabled={busy}
+            className="danger-text"
+            onClick={() => review("delete", selected)}
+          >
+            Delete selected
+          </button>
+          {(entity === "faculty" || entity === "rooms") && (
+            <button
+              disabled={busy}
+              onClick={() => review("deactivate", selected)}
+            >
+              Deactivate selected
+            </button>
+          )}
+          <button disabled={busy} onClick={() => setSelected([])}>
+            Clear selection
+          </button>
+        </div>
+      )}
+      <ErrorMessage message={error} />
+      {message && (
+        <div className="alert success" role="status">
+          {message}
+        </div>
+      )}
+      {plan && (
+        <RecordChangeReview
+          plan={plan}
+          data={data}
+          busy={busy}
+          onApply={() => void applyChange()}
+          onCancel={closeReview}
+          onRefresh={() => setPlan(planRecordChange(data, plan.request))}
+        />
+      )}
       {editing !== undefined && (
         <RecordForm
           key={`${entity}-${editing?.id ?? "new"}`}
@@ -421,14 +521,43 @@ export function Records({
       <p className="note">
         Create records in order: academic year → semester → program → curriculum
         → subjects and sections → offerings. Availability repeats weekly; no
-        faculty windows means unrestricted within scheduling hours. Referenced
-        records must be removed from their dependents first.
+        faculty windows means unrestricted within scheduling hours. Delete
+        previews show connected records before anything is removed. Deactivate
+        faculty or rooms to keep their history while stopping new assignments or
+        bookings.
       </p>
       {rows.length ? (
         <div className="table-wrap">
           <table>
             <thead>
               <tr>
+                {!singleton && (
+                  <th>
+                    <input
+                      type="checkbox"
+                      aria-label="Select all visible records"
+                      disabled={busy}
+                      checked={
+                        rows.length > 0 &&
+                        rows.every((r) => selected.includes(String(r.id)))
+                      }
+                      onChange={(e) =>
+                        setSelected(
+                          e.target.checked
+                            ? [
+                                ...new Set([
+                                  ...selected,
+                                  ...rows.map((r) => String(r.id)),
+                                ]),
+                              ]
+                            : selected.filter(
+                                (id) => !rows.some((r) => r.id === id),
+                              ),
+                        )
+                      }
+                    />
+                  </th>
+                )}
                 {fields.map((f) => (
                   <th key={f}>{human(f)}</th>
                 ))}
@@ -438,6 +567,23 @@ export function Records({
             <tbody>
               {rows.map((r) => (
                 <tr key={String(r.id)}>
+                  {!singleton && (
+                    <td>
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${recordDescription(data, entity, String(r.id))}`}
+                        disabled={busy}
+                        checked={selected.includes(String(r.id))}
+                        onChange={(e) =>
+                          setSelected(
+                            e.target.checked
+                              ? [...selected, String(r.id)]
+                              : selected.filter((id) => id !== r.id),
+                          )
+                        }
+                      />
+                    </td>
+                  )}
                   {fields.map((f) => (
                     <td key={f}>
                       {refs[entity]?.[f]
@@ -456,11 +602,40 @@ export function Records({
                     </td>
                   ))}
                   <td className="row-actions">
-                    <button onClick={() => setEditing(r)}>Edit</button>
+                    <button
+                      disabled={busy}
+                      onClick={() => {
+                        setPlan(null);
+                        setEditing(r);
+                      }}
+                    >
+                      Edit
+                    </button>
+                    {singleton && (
+                      <button
+                        disabled={busy}
+                        onClick={() => review("reset", [String(r.id)])}
+                      >
+                        Reset to defaults
+                      </button>
+                    )}
+                    {(entity === "faculty" || entity === "rooms") && (
+                      <button
+                        disabled={busy}
+                        onClick={() =>
+                          review(r.active ? "deactivate" : "activate", [
+                            String(r.id),
+                          ])
+                        }
+                      >
+                        {r.active ? "Deactivate" : "Activate"}
+                      </button>
+                    )}
                     {!singleton && (
                       <button
                         className="danger-text"
-                        onClick={() => remove(r.id)}
+                        disabled={busy}
+                        onClick={() => review("delete", [String(r.id)])}
                       >
                         Delete
                       </button>

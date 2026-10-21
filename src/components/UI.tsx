@@ -80,10 +80,12 @@ export function Select({
 export function Reference({
   data,
   entity,
+  activeOnly = false,
   ...rest
 }: {
   data: Data;
   entity: Entity;
+  activeOnly?: boolean;
   label: string;
   value: string;
   onChange: (v: string) => void;
@@ -93,10 +95,15 @@ export function Reference({
   return (
     <Select
       {...rest}
-      options={data[entity].map((r) => ({
-        id: r.id,
-        name: rowName(data, entity, r.id),
-      }))}
+      options={data[entity]
+        .filter(
+          (r) =>
+            !activeOnly || !("active" in r) || r.active || r.id === rest.value,
+        )
+        .map((r) => ({
+          id: r.id,
+          name: rowName(data, entity, r.id),
+        }))}
     />
   );
 }

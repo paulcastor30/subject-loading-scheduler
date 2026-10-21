@@ -163,11 +163,13 @@ function QuickRow({
           onChange={(e) => setFaculty(e.target.value)}
         >
           <option value="">Unassigned</option>
-          {data.faculty.map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.name}
-            </option>
-          ))}
+          {data.faculty
+            .filter((f) => f.active || f.id === faculty)
+            .map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.name}
+              </option>
+            ))}
         </select>
       </td>
       <td>
@@ -583,6 +585,7 @@ export function Scheduling({
                     <Reference
                       data={data}
                       entity="faculty"
+                      activeOnly
                       label="Faculty member"
                       value={facultyId}
                       onChange={setFacultyId}
@@ -764,6 +767,7 @@ export function Scheduling({
                 <Reference
                   data={data}
                   entity="faculty"
+                  activeOnly
                   label="Assign faculty"
                   value={bulkFaculty}
                   onChange={setBulkFaculty}
@@ -807,6 +811,7 @@ export function Scheduling({
                 <Reference
                   data={data}
                   entity="rooms"
+                  activeOnly
                   label="Bulk room"
                   value={bulkRoom}
                   onChange={setBulkRoom}

@@ -18,9 +18,9 @@ The application was reviewed as a single-browser academic loading tool: initial 
 | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | TypeScript project check                       | Passed                                                                                                                      |
 | ESLint                                         | Passed                                                                                                                      |
-| Vitest / React Testing Library                 | 71 tests passed across 7 files                                                                                              |
+| Vitest / React Testing Library                 | 88 tests passed across 8 files                                                                                              |
 | Vite production build                          | Passed, no build warnings                                                                                                   |
-| Playwright Chromium against production preview | 7 workflows passed                                                                                                          |
+| Playwright Chromium against production preview | 9 workflows passed                                                                                                          |
 | Production sample-data scan                    | No removed sample labels, faculty names or BSCA sample IDs in dist                                                          |
 | Representative scale fixture                   | 50 faculty, 300 subjects, 500 offerings/meetings, 100 rooms passed validation, availability, utilization and summary checks |
 
@@ -37,3 +37,9 @@ Records remain in one browser/device. Keep regular external JSON backups, plus P
 Schedules represent a recurring week, without date-specific holidays or examination exceptions. Distinct laboratory groups within one offering are treated as disjoint; across different courses the section-overlap check is conservative because individual student membership is not stored. Suggestions assist scheduling but do not solve the entire department automatically. Normal data operations work in an already-loaded offline tab; offline reload is not guaranteed. No cross-device synchronization is provided.
 
 The time-to-completion targets, formal WCAG conformance, assistive-technology behavior and cross-browser matrix have not been independently certified. Local browser checks used Chromium; CI installs its own matching Chromium. Screenshots/PDFs/traces are ignored test artifacts.
+
+## Reviewed record deletion and status management
+
+Added a centralized transitive deletion planner using the data model relationships. The planner computes names/counts and validates the complete result before confirmation. Tests cover semester/year deletion, shared-record preservation, dependent cleanup, multi-record deletion without duplicate counts, faculty/room removal semantics, finalized-term protection, explicit whole-finalized-term deletion, load-category credit preservation, missing IDs and stale previews. Rule resets compare defaults and reject invalid results before saving. Inactive faculty/rooms can remain in historical records as warnings; new/changed assignments and meetings are checked against active resources across normal saves, imports and semester copying.
+
+Component tests cover dependency previews, confirmation gating, cancellation, bulk selection, stale-preview re-review and required-rule resets. Two additional production browser workflows exercise cancel/delete/undo/redo/reload, preservation of shared faculty, bulk deletion, rule reset and deactivation with preserved bookings and exclusion from new faculty choices. No user operational records were deleted for these tests.

@@ -7,7 +7,7 @@ import {
   integrity,
   type Data,
 } from "./model";
-import { validate } from "./engine";
+import { checkActiveResourceChanges, validate } from "./engine";
 export const BACKUP_VERSION = 2;
 export class SchedulerDB extends Dexie {
   meta!: Table<{ key: string; value: string }, string>;
@@ -183,5 +183,6 @@ export function duplicateSemester(
       );
     }
   }
+  checkActiveResourceChanges(data, next);
   return checkData(next);
 }

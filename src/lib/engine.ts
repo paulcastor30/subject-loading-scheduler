@@ -115,9 +115,9 @@ export function validate(data: Data, semesterId?: string): Issue[] {
       const faculty = data.faculty.find((f) => f.id === assignment.facultyId);
       if (!faculty?.active)
         add(
-          "error",
+          "warning",
           "inactive-faculty",
-          `${offeringName(data, o.id)} requires an active faculty member.`,
+          `${offeringName(data, o.id)} retains inactive faculty ${faculty?.name ?? ""}. Historical records are preserved; activate or reassign before new scheduling.`,
           undefined,
           o.id,
         );
@@ -256,7 +256,12 @@ export function validate(data: Data, semesterId?: string): Issue[] {
         m,
       );
     if (!room?.active)
-      add("error", "inactive-room", `${context}: choose an active room.`, m);
+      add(
+        "warning",
+        "inactive-room",
+        `${context}: ${room?.code ?? "Room"} is inactive. Existing bookings are preserved; activate or move the booking before editing it.`,
+        m,
+      );
     if (room && section && room.capacity < (group?.students ?? section.size))
       add(
         "error",
@@ -495,6 +500,8 @@ export function suggestions(
   const faculty = data.assignments.find(
     (a) => a.offeringId === offeringId && a.groupId === groupId,
   )?.facultyId;
+  if (faculty && !data.faculty.some((f) => f.id === faculty && f.active))
+    return [];
   const relevant = data.meetings.filter(
     (m) =>
       data.offerings.find((o) => o.id === m.offeringId)?.semesterId ===
@@ -544,4 +551,45 @@ export function suggestions(
       }
     }
   return result;
+}
+
+// Inactive resources may remain in historical records, but cannot receive new work.
+export function checkActiveResourceChanges(before: Data, next: Data) {
+  const offeringChanged = (id: string) =>
+    JSON.stringify(before.offerings.find((o) => o.id === id)) !==
+    JSON.stringify(next.offerings.find((o) => o.id === id));
+  const activeFaculty = (id?: string) =>
+    next.faculty.some((f) => f.id === id && f.active);
+  for (const a of next.assignments) {
+    const old = before.assignments.find((v) => v.id === a.id);
+    if (
+      (!old ||
+        old.facultyId !== a.facultyId ||
+        old.offeringId !== a.offeringId ||
+        old.groupId !== a.groupId ||
+        offeringChanged(a.offeringId)) &&
+      !activeFaculty(a.facultyId)
+    )
+      throw new Error(
+        "Choose an active faculty member for a new or changed assignment. Existing historical assignments may remain inactive.",
+      );
+  }
+  for (const m of next.meetings) {
+    const old = before.meetings.find((v) => v.id === m.id);
+    if (
+      old &&
+      JSON.stringify(old) === JSON.stringify(m) &&
+      !offeringChanged(m.offeringId)
+    )
+      continue;
+    if (!next.rooms.some((r) => r.id === m.roomId && r.active))
+      throw new Error(
+        "Choose an active room for a new or changed meeting. Existing historical bookings may remain inactive.",
+      );
+    const assignment = meetingAssignment(next, m);
+    if (assignment && !activeFaculty(assignment.facultyId))
+      throw new Error(
+        "Activate or reassign this faculty member before adding or changing a meeting.",
+      );
+  }
 }

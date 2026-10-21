@@ -72,3 +72,19 @@ To finalize, edit the semester's **Finalized** checkbox after review and backup.
 ## Existing data and backups
 
 The update preserves existing simple offerings and browser records. Database version 2 adds teaching groups, load categories and other duty activities. JSON backup version 2 is now exported; version 1 backups still restore. After updating, download a fresh backup. Save visible group/row drafts before switching offerings or pages.
+
+## Delete records without navigating through dependencies
+
+In **Academic records & rules**, choose the record type. Click a row’s **Delete**, or select several rows (the header checkbox selects all visible filtered rows) and choose **Delete selected**. Selection persists when you filter the same record type; the selected count includes any selected rows hidden by the filter. Use **Clear selection** to start over.
+
+The inline review lists names and counts for every affected record. Expand each category to inspect connected records. Deleting a semester removes its offerings, lecture/lab groups, assignments, meetings and other duty credits while keeping shared faculty, subjects, programs, curricula, student sections and rooms. Deleting a year includes its semesters. Deleting faculty removes teaching assignments, duties and availability but keeps class offerings and room bookings for reassignment. Deleting rooms removes their meetings and availability while keeping classes and instructors. Removing a load-credit category keeps groups and converts their current credits to sourced overrides so calculated totals do not change silently.
+
+Check the review acknowledgement, then apply the displayed action. **Cancel** changes nothing. **Undo** restores the whole operation during the current session; refresh ends session Undo. Download a JSON backup before large deletions. If records change after preview, use **Review changes again**. Deleting an entire finalized semester is explicitly identified in the preview; partial deletion of records used by a finalized semester requires reopening that semester first.
+
+## Deactivate instead of deleting history
+
+Faculty and rooms have **Deactivate** and **Activate** actions. You can also select several and choose **Deactivate selected**. Review the status change before saving. Deactivation keeps historical assignments, weekly schedules, duty credits and reports, with visible inactive-resource warnings. Inactive resources are unavailable for new assignments/bookings. Activate or reassign before modifying affected meetings. Undo can reverse deactivation.
+
+## Reset required rules
+
+Choose **Workload rule** or **Scheduling rule**, then **Reset to defaults**. Compare current/default values in the preview. Application defaults are not institutional policy. The reset is blocked if it would make existing schedules invalid. No academic records or schedules are deleted. Confirm the reviewed reset, or cancel; session Undo also applies.

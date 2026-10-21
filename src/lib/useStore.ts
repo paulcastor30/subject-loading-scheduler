@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { emptyData, uid, type Data } from "./model";
 import { checkData, db, readData, writeData } from "./storage";
+import { checkActiveResourceChanges } from "./engine";
 export type Commit = (next: Data, description: string) => Promise<boolean>;
 export function useStore() {
   const [data, setData] = useState<Data>(emptyData),
@@ -48,6 +49,7 @@ export function useStore() {
     setStatus("Saving…");
     try {
       checkData(next);
+      if (mode === "normal") checkActiveResourceChanges(current.current, next);
       for (const term of (mode === "normal"
         ? current.current.semesters
         : []

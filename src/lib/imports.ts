@@ -2,6 +2,7 @@ import readXlsxFile from "read-excel-file";
 import writeXlsxFile from "write-excel-file";
 import { entities, schemas, uid, type Data, type Entity } from "./model";
 import { checkData } from "./storage";
+import { checkActiveResourceChanges } from "./engine";
 export type RawRow = Record<string, string>;
 export type ImportPreview = {
   source: Data;
@@ -74,6 +75,7 @@ export function previewImport(
     (candidate[entity] as unknown[]).push(parsed.data);
     try {
       checkData(candidate);
+      checkActiveResourceChanges(data, candidate);
       (next[entity] as unknown[]).push(parsed.data);
       added++;
     } catch (error) {

@@ -388,3 +388,125 @@ test("semester setup and selected Form 3 import with reviewed group credits", as
     page.getByRole("heading", { name: "Lab B181.1", exact: true }),
   ).toBeVisible();
 });
+
+test("reviewed semester deletion preserves shared records, supports undo and persists", async ({
+  page,
+}) => {
+  await restoreTestRecords(page);
+  await page.getByRole("button", { name: "Academic records & rules" }).click();
+  await page
+    .getByLabel("Record type", { exact: true })
+    .selectOption("semesters");
+  const first = page.getByRole("row").filter({ hasText: "First semester" });
+  await first.getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Review deletion" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Subject offerings (3)", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Delete 7 records" }),
+  ).toBeDisabled();
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(first).toBeVisible();
+  await first.getByRole("button", { name: "Delete", exact: true }).click();
+  await page.getByRole("checkbox", { name: /I reviewed/ }).check();
+  await page.getByRole("button", { name: "Delete 7 records" }).click();
+  await expect(
+    page.getByText("Deleted 7 records.", { exact: false }),
+  ).toBeVisible();
+  await expect(first).toHaveCount(0);
+  await page.getByLabel("Record type", { exact: true }).selectOption("faculty");
+  await expect(
+    page.getByRole("cell", { name: "Alex Rivera (sample)", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "↶ Undo" }).click();
+  await page
+    .getByLabel("Record type", { exact: true })
+    .selectOption("semesters");
+  await expect(first).toBeVisible();
+  await page.getByRole("button", { name: "↷ Redo" }).click();
+  await expect(first).toHaveCount(0);
+  await page.reload();
+  await page.getByRole("button", { name: "Academic records & rules" }).click();
+  await page
+    .getByLabel("Record type", { exact: true })
+    .selectOption("semesters");
+  await expect(first).toHaveCount(0);
+  await expect(
+    page.getByRole("row").filter({ hasText: "Second semester" }),
+  ).toBeVisible();
+});
+
+test("bulk deletion, reviewed rule reset and deactivation preserve recoverable history", async ({
+  page,
+}) => {
+  await restoreTestRecords(page);
+  await page.getByRole("button", { name: "Academic records & rules" }).click();
+  await page
+    .getByLabel("Record type", { exact: true })
+    .selectOption("subjects");
+  await page
+    .getByRole("checkbox", { name: "Select all visible records" })
+    .check();
+  await page
+    .getByRole("button", { name: "Delete selected", exact: true })
+    .click();
+  await expect(page.getByText("Subjects (3)", { exact: true })).toBeVisible();
+  await page.getByRole("checkbox", { name: /I reviewed/ }).check();
+  await page.getByRole("button", { name: "Delete 9 records" }).click();
+  await expect(
+    page.getByText("Deleted 9 records.", { exact: false }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "↶ Undo" }).click();
+  await expect(
+    page.getByRole("cell", { name: "CS 101", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByLabel("Record type", { exact: true })
+    .selectOption("workloadRules");
+  await page
+    .getByRole("button", { name: "Reset to defaults", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Review rule reset" }),
+  ).toBeVisible();
+  await page.getByRole("checkbox", { name: /I reviewed/ }).check();
+  await page
+    .getByRole("button", { name: "Reset to defaults", exact: true })
+    .first()
+    .click();
+  await expect(
+    page.getByText("Reset 1 record.", { exact: false }),
+  ).toBeVisible();
+  await page.getByLabel("Record type", { exact: true }).selectOption("faculty");
+  const faculty = page.getByRole("row").filter({ hasText: "Alex Rivera" });
+  await faculty
+    .getByRole("button", { name: "Deactivate", exact: true })
+    .click();
+  await page.getByRole("checkbox", { name: /I reviewed/ }).check();
+  await page
+    .getByRole("button", { name: "Deactivate 1 record", exact: true })
+    .click();
+  await expect(
+    faculty.getByRole("button", { name: "Activate", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "Loading & scheduling" }).click();
+  await page.getByRole("button", { name: /CS 101 · BSCS 1A/ }).click();
+  await expect(
+    page.getByText("Monday 08:00–10:00", { exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: /CS 201 · BSCS 2A/ }).click();
+  await expect(
+    page
+      .getByLabel("Faculty member", { exact: true })
+      .locator('option[value="fac1"]'),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "↶ Undo" }).click();
+  await page.getByRole("link", { name: "Settings & data" }).click();
+  await page.getByLabel("Record type", { exact: true }).selectOption("faculty");
+  await expect(
+    faculty.getByRole("button", { name: "Deactivate", exact: true }),
+  ).toBeVisible();
+});

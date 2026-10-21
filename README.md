@@ -66,7 +66,7 @@ The optional overload-warning setting applies only to the destination semester. 
 - **Loading & scheduling:** guided assignment, faculty workloads, suggested room/time combinations, lecture/lab meeting CRUD and duplication, searchable resource selectors, program/faculty/subject/section/room filters, weekly timetable, and schedule review.
 - **Quick edit:** inline day/start/end/room fields, Tab navigation, Ctrl/⌘ + Enter to save a row, Escape to reset, bulk assignment of filtered offerings, selected-meeting day/room edits and deletion. Bulk changes are validated atomically.
 - **Rooms:** live availability search by day/time, size, room type, equipment; capacity-fit ordering, room weekly schedules, available/blocked windows, and occupied/available minutes.
-- **Records:** validated create/edit/delete for all domain entities. Referenced records cannot be deleted until dependent records are removed; there is no silent cascade.
+- **Records:** validated create/edit/delete for all domain entities. Delete previews list selected records and all dependent records by name and count. Bulk selections delete in one validated, undoable operation after an explicit review. Deleting a semester keeps shared faculty, subjects, sections, programs and rooms. Faculty/rooms can be deactivated while preserving history; required rules have reviewed resets.
 - **Data management:** CSV/XLSX import, mapping, preview, row errors, explicit valid-row commit, CSV templates, reference-ID Excel export, semester copy, JSON backup/restore, last requested-backup indicator, and persistent-storage request.
 - **Reports:** all nine required report formats plus an OVCAA Form 3 loading summary, program/resource filters, Excel downloads, browser print / Save PDF, report metadata, calculation notes, and print styles.
 - **Undo/redo:** up to 20 saved changes in the current session, including imports and restoration. Refresh clears undo/redo. Recent-change history keeps the latest 250 events in IndexedDB.
@@ -158,7 +158,7 @@ e2e/                 Production browser workflows
 
 ## Verification and boundaries
 
-[Local verification results](docs/VERIFICATION.md): 71 unit/component tests and 7 production browser tests passed; TypeScript, ESLint, and the production build passed.
+[Local verification results](docs/VERIFICATION.md): 88 unit/component tests and 9 production browser tests passed; TypeScript, ESLint, and the production build passed.
 
 Tests cover faculty/room/section conflicts, adjacency, containment, multiple meetings, different semesters, capacity, equipment/type, availability windows/blocks, load factors and limits, invalid references/duplicates, utilization, valid suggestions, CSV errors, preview imports, backup/restore, semester copying, IndexedDB reopen and stale writes, academic form creation, browser scheduling/editing/refresh, room search, reports, Excel import/export, and backup restoration. The README describes supported behavior rather than guaranteeing task completion times or WCAG certification.
 

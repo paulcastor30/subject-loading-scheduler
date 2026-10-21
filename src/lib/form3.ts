@@ -1,6 +1,7 @@
 import readXlsxFile, { readSheetNames } from "read-excel-file";
 import { uid, type Data, type Row } from "./model";
 import { checkData } from "./storage";
+import { checkActiveResourceChanges } from "./engine";
 export type Grid = unknown[][];
 export type FormLine = {
   row: number;
@@ -563,5 +564,6 @@ export function buildForm3Import(
     next.semesters = next.semesters.map((t) =>
       t.id === term.id ? { ...t, overloadPolicy: "warning" } : t,
     );
+  checkActiveResourceChanges(data, next);
   return checkData(next);
 }
