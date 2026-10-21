@@ -7,7 +7,7 @@ import {
   type FormOptions,
   type Grid,
 } from "./form3";
-import { sampleData } from "./sample";
+import { sampleData } from "../../tests/fixtures/academicData";
 import { checkData } from "./storage";
 import { workload } from "./engine";
 const grid: Grid = [

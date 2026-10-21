@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import Dexie from "dexie";
-import { sampleData } from "./sample";
+import { sampleData } from "../../tests/fixtures/academicData";
 import {
   enableGroups,
   groupCredits,

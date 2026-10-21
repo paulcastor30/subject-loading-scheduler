@@ -7,7 +7,7 @@ import {
   validate,
   workload,
 } from "./engine";
-import { sampleData } from "./sample";
+import { sampleData } from "../../tests/fixtures/academicData";
 import { checkData } from "./storage";
 function collision() {
   const d = sampleData();

@@ -1,4 +1,4 @@
-import { emptyData, type Data } from "./model";
+import { emptyData, type Data } from "../../src/lib/model";
 export function sampleData(): Data {
   return {
     ...emptyData(),

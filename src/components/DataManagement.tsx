@@ -1,14 +1,7 @@
 import { Form3Import } from "./Form3Import";
-import { BscaSamplePanel } from "./BscaSamplePanel";
 import { readPreference, writePreference } from "../lib/preferences";
 import { useState } from "react";
-import {
-  entities,
-  labels,
-  rowName,
-  type Data,
-  type Entity,
-} from "../lib/model";
+import { labels, rowName, type Data, type Entity } from "../lib/model";
 import type { Commit } from "../lib/useStore";
 import { backup, db, duplicateSemester, restore } from "../lib/storage";
 import {
@@ -23,7 +16,6 @@ import {
   type ImportPreview,
   type RawRow,
 } from "../lib/imports";
-import { sampleData } from "../lib/sample";
 import { Badge, ErrorMessage, Field, Panel, Reference } from "./UI";
 export function DataManagement({
   data,
@@ -421,41 +413,6 @@ export function DataManagement({
               Copy semester
             </button>
           </div>
-        </div>
-      </Panel>
-      <BscaSamplePanel data={data} commit={commit} />
-      <Panel title="Optional sample dataset">
-        <div className="padded">
-          <p>
-            Explore a small fictional Computer Science department. Sample
-            faculty are explicitly labeled. Loading the sample is available only
-            when the database has no academic records.
-          </p>
-          <button
-            disabled={
-              busy ||
-              entities
-                .filter(
-                  (e) => !["workloadRules", "schedulingRules"].includes(e),
-                )
-                .some((e) => data[e].length > 0)
-            }
-            onClick={() =>
-              void run(async () => {
-                if (
-                  await commit(
-                    sampleData(),
-                    "Loaded optional fictional sample dataset",
-                  )
-                )
-                  setMessage(
-                    "Sample loaded. Select First semester in the header.",
-                  );
-              })
-            }
-          >
-            Load fictional sample data
-          </button>
         </div>
       </Panel>
       {busy && <p role="status">Processing…</p>}

@@ -54,9 +54,8 @@ export function Dashboard({
       </div>
       {!data.semesters.length && (
         <div className="alert warning">
-          Start with Settings → Records to create an academic year and semester,
-          or add the BSCA prospectus sample under Data management & backups.
-          This workspace starts empty.
+          Start with the semester setup below, then add your academic records or
+          import your previous loading. This workspace starts empty.
         </div>
       )}
       <div className="next-steps no-print">

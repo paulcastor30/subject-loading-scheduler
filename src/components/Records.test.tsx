@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 import { Records } from "./Records";
-import { sampleData } from "../lib/sample";
+import { sampleData } from "../../tests/fixtures/academicData";
 it("creates and validates a subject through the academic record form", async () => {
   const user = userEvent.setup(),
     commit = vi.fn().mockResolvedValue(true);

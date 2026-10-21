@@ -1,6 +1,6 @@
 # Subject Loading and Scheduling System (SLSS)
 
-A local-first academic administration application built with React, TypeScript, Vite, Tailwind CSS, Dexie/IndexedDB, and browser-based Excel libraries. No server, account, API key, subscription, or external database is required. The application starts empty; both the BSCA prospectus planning sample and fictional tour data are explicit opt-ins.
+A local-first academic administration application built with React, TypeScript, Vite, Tailwind CSS, Dexie/IndexedDB, and browser-based Excel libraries. No server, account, API key, subscription, or external database is required. The application starts empty for your real academic records. No demonstration data or sample loaders are included in the deployed application.
 
 ## Run locally
 
@@ -27,7 +27,7 @@ The browser tests run against the **production** build on port 4173. Run `pnpm b
 
 ## First use
 
-1. Open **Settings & data → Academic records & rules**. Create an academic year, semester, academic program, and curriculum, in that order.
+1. On **Overview**, choose **Start a semester / draft** to create your academic year, semester, program and initial curriculum. Use **Import previous loading** for a reviewed Form 3 workbook, or add your records in Settings.
 2. Add subjects (student course units, weekly lecture contact hours, weekly laboratory contact hours, equipment), faculty (specialization, load limit), student sections (program, year, class size), and rooms.
 3. Review **Workload rule** and **Scheduling rule**. Configure lecture/lab load factors, working days, opening/closing hours, and the severity of overload. Defaults are examples, not institutional policy.
 4. Select the semester in the header. In **Loading & scheduling**, add subject offerings linking subjects and student sections to that semester.
@@ -35,15 +35,7 @@ The browser tests run against the **production** build on port 4173. Run `pnpm b
 6. Review **Review & conflicts** for unassigned offerings and mismatched contact hours. Blocking errors prevent persistence and show an actionable message; valid partial schedules may be saved with visible review warnings.
 7. Generate reports, export a full JSON backup, and optionally finalize the semester in Settings. Reopen the semester before changing its offerings or schedules.
 
-For a tour, **Data management & backups → Load fictional sample data** is available only on an empty academic database. All sample names are fictional and explicitly labeled. [Basic user guide](docs/USER_GUIDE.md) covers daily workflows.
-
-## BSCA prospectus sample
-
-Open **Settings & data → Data management & backups → BSCA prospectus sample**. Review the course table and source notes, then choose **Add BSCA prospectus sample**. Select **BSCA sample planning year** in the academic-term header. The sample is added alongside existing records; it does not replace records or workload/scheduling rules. Duplicate loading is blocked; incompatible course codes stop the operation without partial writes. Undo is available in the current session.
-
-This sample transcribes the supplied *Bachelor of Science in Computer Applications* prospectus, **BOR Resolution No. 129, Series of 2018**: 51 curriculum rows across eight semester lists, including four elective slots, plus eight suggested technical electives (59 catalog entries). Two planning terms contain 28 first-semester and 23 second-semester offerings across four illustrative year-level blocks of 30 students. No faculty, rooms, assignments or schedules are invented. The suggested technical electives are options, not eight additional mandatory offerings. Replace elective-slot offerings with selected catalog courses before scheduling.
-
-The sample preserves course-row units and separate lecture/lab hours. The PDF's printed semester/grand totals conflict with its rows; the 51 rows sum to 159 numeric units including NST (153 excluding NST), whereas the printed grand total is 147(153). NST units shown as `(3)` are stored as 3 and retain that notation in the source preview. NST001 has a printed total-hours value of 30 despite lecture 3 / lab 0: the separate component columns are used. BCA197 retains 6 units, lecture 0 / lab 40 hours/week; its source also states 700hrs. These are not faculty credit rules or an instruction to book an internship in a campus laboratory. Confirm departmental treatment of internship, NST and thesis before assignment. Source prerequisite/corequisite and track information is visible in the preview, but is not an enrollment-validation feature. This sample does not claim the 2018 prospectus is the currently approved curriculum.
+[Basic user guide](docs/USER_GUIDE.md) covers setup and daily workflows.
 
 ## Faster everyday workflow
 
@@ -66,7 +58,7 @@ Open **Settings & data → Data management & backups → Import your OVCAA Form 
 5. Default **Load records only** retains original time/day/room text as source notes and leaves meetings unscheduled. To import bookings now, enable that option, map room spelling variations, and confirm capacities/types for new rooms. TBA, ambiguous times, disabled days/hours, capacity failures and resource conflicts must be resolved or the affected rows excluded before importing bookings. New room locations are explicitly marked for confirmation; equipment is not invented.
 6. Review/edit included rows. Day combinations such as MTh, TF, MT and ThF expand into separate meetings. Times require explicit AM/PM (NN is treated as noon). Exclude duplicate alternative assignments. Confirm the source/target choice, validate the complete proposed change, inspect its counts, then choose **Import reviewed loading**.
 
-The optional overload-warning setting applies only to the destination semester. It preserves reported historical loads for review without changing the department-wide policy. Reimporting existing offerings/duties is rejected instead of silently overwriting them. The preview becomes invalid if local records change before commit. All file processing is local; faculty files and imported operational data are never included in the static deployment or public sample.
+The optional overload-warning setting applies only to the destination semester. It preserves reported historical loads for review without changing the department-wide policy. Reimporting existing offerings/duties is rejected instead of silently overwriting them. The preview becomes invalid if local records change before commit. All file processing is local; faculty files and imported operational data are never included in the static deployment or source repository.
 
 ## Functional modules
 
@@ -142,7 +134,7 @@ The repository's configured remote is `paulcastor30/subject-loading-scheduler`; 
 
 Vite's base is `/subject-loading-scheduler/`; hash navigation (`#rooms`, `#scheduling/timetable`, etc.) works on static hosting and direct refresh without server rewrites. The published artifact is **only `dist/`**. No secret/environment configuration is needed. If renaming the repository, update the Vite base and deployment documentation.
 
-**Deployment readiness does not mean deployment has occurred.** The checked-in workflow still needs to run in GitHub, and Pages must be enabled. The application is deployed through this workflow; inspect the latest successful run and verify the live page after each update.
+The application is deployed through this workflow at [the SLSS website](https://paulcastor30.github.io/subject-loading-scheduler/). Inspect the latest successful run and verify the live page after each update.
 
 ## Structure
 
@@ -158,16 +150,15 @@ src/
     imports.ts       CSV/XLSX parsing, preview validation, downloads
     reports.ts       Deterministic report projections
     useStore.ts      Save state, finalization guard, session undo/redo
-    sample.ts        Explicitly fictional optional sample records
-    bscaSample.ts    Prospectus transcription, provenance, safe additive loading
   test/              DOM and IndexedDB test setup
+tests/fixtures/      Synthetic records used only by automated tests
 e2e/                 Production browser workflows
 .github/workflows/   Quality gates and static Pages deployment
 ```
 
 ## Verification and boundaries
 
-[Local verification results](docs/VERIFICATION.md): 75 unit/component tests and 7 production browser tests passed; TypeScript, ESLint, and the production build passed.
+[Local verification results](docs/VERIFICATION.md): 71 unit/component tests and 7 production browser tests passed; TypeScript, ESLint, and the production build passed.
 
 Tests cover faculty/room/section conflicts, adjacency, containment, multiple meetings, different semesters, capacity, equipment/type, availability windows/blocks, load factors and limits, invalid references/duplicates, utilization, valid suggestions, CSV errors, preview imports, backup/restore, semester copying, IndexedDB reopen and stale writes, academic form creation, browser scheduling/editing/refresh, room search, reports, Excel import/export, and backup restoration. The README describes supported behavior rather than guaranteeing task completion times or WCAG certification.
 

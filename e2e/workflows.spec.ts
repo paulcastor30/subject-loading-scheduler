@@ -1,18 +1,25 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+import { sampleData } from "../tests/fixtures/academicData";
+import { backup } from "../src/lib/storage";
+
+// Provision only through the real backup-restoration UI. No test-data loader is shipped.
+async function restoreTestRecords(page: Page) {
+  await page.goto("#settings/import");
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByLabel("Restore JSON backup").setInputFiles({
+    name: "automated-test.backup.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(backup(sampleData())),
+  });
+  await expect(page.getByText("Backup restored successfully.")).toBeVisible();
+}
+
 test("academic workflow, persistence, room search, exports and backup restore", async ({
   page,
 }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  await page.goto("");
-  await page.getByRole("link", { name: "Settings & data" }).click();
-  await page.getByRole("button", { name: "Data management & backups" }).click();
-  await page
-    .getByRole("button", { name: "Load fictional sample data" })
-    .click();
-  await expect(
-    page.getByText("Sample loaded.", { exact: false }),
-  ).toBeVisible();
+  await restoreTestRecords(page);
   await page.getByRole("link", { name: "Loading & scheduling" }).click();
   await page.getByRole("button", { name: /CS 201 · BSCS 2A/ }).click();
   await page.getByLabel("Faculty member").selectOption("fac1");
@@ -128,14 +135,7 @@ test("loaded application edits offline and produces a print-ready PDF", async ({
   page,
   context,
 }, testInfo) => {
-  await page.goto("#settings");
-  await page.getByRole("button", { name: "Data management & backups" }).click();
-  await page
-    .getByRole("button", { name: "Load fictional sample data" })
-    .click();
-  await expect(
-    page.getByText("Sample loaded.", { exact: false }),
-  ).toBeVisible();
+  await restoreTestRecords(page);
   await context.setOffline(true);
   await page.getByRole("link", { name: "Loading & scheduling" }).click();
   await page.getByRole("button", { name: /MATH 101 · BSCS 1A/ }).click();
@@ -174,71 +174,34 @@ test("loaded application edits offline and produces a print-ready PDF", async ({
   });
 });
 
-test("BSCA prospectus preview adds all courses safely and persists across refresh", async ({
+test("production workspace starts empty and backup shortcut opens recovery tools", async ({
   page,
 }) => {
-  await page.goto("#settings");
-  await page.getByRole("button", { name: "Data management & backups" }).click();
-  await page
-    .getByText("Review course list and source notes", { exact: true })
-    .click();
-  await page.getByLabel("Preview year or electives").selectOption("4");
+  await page.goto("");
+  await expect(page.getByLabel("Academic term", { exact: true })).toHaveValue(
+    "",
+  );
   await expect(
-    page.getByRole("cell", { name: "BCA197", exact: true }),
+    page.getByRole("button", { name: "Create semester workspace" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Back up your data ↗" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Backups & local storage" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("cell", { name: "40", exact: true }),
-  ).toBeVisible();
-  await page
-    .getByRole("button", { name: "Add BSCA prospectus sample", exact: true })
-    .click();
-  await expect(
-    page.getByRole("button", {
-      name: "BSCA prospectus sample added",
-      exact: true,
-    }),
-  ).toBeDisabled();
-  await page
-    .getByLabel("Academic term", { exact: true })
-    .selectOption("bsca-2018-semester-1");
-  await page.getByRole("link", { name: "Loading & scheduling" }).click();
-  await expect(
-    page.getByRole("heading", { name: "Subject offerings (28)" }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: /BCA111 · BSCA 1A \(sample\)/ }),
-  ).toBeVisible();
+    page.getByRole("button", { name: /sample|fictional/i }),
+  ).toHaveCount(0);
+  await expect(page.getByText(/prospectus|simulation/i)).toHaveCount(0);
   await page.reload();
   await expect(
-    page.getByRole("heading", { name: "Subject offerings (28)" }),
+    page.getByRole("heading", { name: "Backups & local storage" }),
   ).toBeVisible();
-  await page
-    .getByLabel("Academic term", { exact: true })
-    .selectOption("bsca-2018-semester-2");
-  await expect(
-    page.getByRole("heading", { name: "Subject offerings (23)" }),
-  ).toBeVisible();
-  await page.getByRole("link", { name: "Settings & data" }).click();
-  await page.getByRole("button", { name: "Data management & backups" }).click();
-  await expect(
-    page.getByRole("button", {
-      name: "BSCA prospectus sample added",
-      exact: true,
-    }),
-  ).toBeDisabled();
 });
 
 test("separate lab groups, parallel rooms, faculty duties and Form 3 report", async ({
   page,
 }, testInfo) => {
-  await page.goto("#settings");
-  await page.getByRole("button", { name: "Data management & backups" }).click();
-  await page
-    .getByRole("button", { name: "Load fictional sample data" })
-    .click();
-  await expect(
-    page.getByText("Sample loaded.", { exact: false }),
-  ).toBeVisible();
+  await restoreTestRecords(page);
   await page.getByRole("button", { name: "Academic records & rules" }).click();
   await page.getByLabel("Record type", { exact: true }).selectOption("rooms");
   await page.getByRole("button", { name: "+ Add record" }).click();

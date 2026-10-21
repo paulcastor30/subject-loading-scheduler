@@ -18,13 +18,27 @@ export function FacultyLoads({
     [name, setName] = useState(""),
     [kind, setKind] = useState<Row<"loadActivities">["kind"]>("administration"),
     [credits, setCredits] = useState(0),
-    [reference, setReference] = useState("");
+    [reference, setReference] = useState(""),
+    [busy, setBusy] = useState(false);
   const teacher = data.faculty.find((f) => f.id === faculty),
     activities = data.loadActivities.filter(
       (a) => a.semesterId === term && a.facultyId === faculty,
     );
+  function clearDraft() {
+    setEditing(null);
+    setName("");
+    setKind("administration");
+    setCredits(0);
+    setReference("");
+  }
+  function chooseFaculty(id: string) {
+    setFaculty(id);
+    clearDraft();
+  }
   async function save(e: FormEvent) {
     e.preventDefault();
+    if (busy) return;
+    setBusy(true);
     const row = {
       id: editing?.id ?? uid(),
       semesterId: term,
@@ -34,22 +48,23 @@ export function FacultyLoads({
       credits,
       reference,
     };
-    if (
-      await commit(
-        {
-          ...data,
-          loadActivities: [
-            ...data.loadActivities.filter((a) => a.id !== row.id),
-            row,
-          ],
-        },
-        `${editing ? "Updated" : "Added"} faculty duty`,
-      )
-    ) {
-      setName("");
-      setCredits(0);
-      setReference("");
-      setEditing(null);
+    try {
+      if (
+        await commit(
+          {
+            ...data,
+            loadActivities: [
+              ...data.loadActivities.filter((a) => a.id !== row.id),
+              row,
+            ],
+          },
+          `${editing ? "Updated" : "Added"} faculty duty`,
+        )
+      ) {
+        clearDraft();
+      }
+    } finally {
+      setBusy(false);
     }
   }
   return (
@@ -81,11 +96,8 @@ export function FacultyLoads({
                   <tr key={f.id}>
                     <td>
                       <button
-                        onClick={() => {
-                          setFaculty(f.id);
-                          setEditing(null);
-                          setName("");
-                        }}
+                        disabled={busy}
+                        onClick={() => chooseFaculty(f.id)}
                       >
                         {f.name}
                       </button>
@@ -141,11 +153,7 @@ export function FacultyLoads({
             entity="faculty"
             label="Faculty member"
             value={faculty}
-            onChange={(v) => {
-              setFaculty(v);
-              setEditing(null);
-              setName("");
-            }}
+            onChange={chooseFaculty}
           />
           {teacher && term ? (
             <>
@@ -166,6 +174,7 @@ export function FacultyLoads({
                   </span>
                   <div className="actions">
                     <button
+                      disabled={busy}
                       onClick={() => {
                         setEditing(a);
                         setName(a.name);
@@ -178,17 +187,28 @@ export function FacultyLoads({
                     </button>
                     <button
                       className="danger-text"
-                      onClick={() => {
-                        if (confirm("Remove this duty and its credits?"))
-                          void commit(
-                            {
-                              ...data,
-                              loadActivities: data.loadActivities.filter(
-                                (n) => n.id !== a.id,
-                              ),
-                            },
-                            "Removed faculty duty",
-                          );
+                      disabled={busy}
+                      onClick={async () => {
+                        if (!confirm("Remove this duty and its credits?"))
+                          return;
+                        setBusy(true);
+                        try {
+                          if (
+                            await commit(
+                              {
+                                ...data,
+                                loadActivities: data.loadActivities.filter(
+                                  (n) => n.id !== a.id,
+                                ),
+                              },
+                              "Removed faculty duty",
+                            )
+                          ) {
+                            if (editing?.id === a.id) clearDraft();
+                          }
+                        } finally {
+                          setBusy(false);
+                        }
                       }}
                     >
                       Remove
@@ -197,66 +217,62 @@ export function FacultyLoads({
                 </div>
               ))}
               <form onSubmit={save} className="record-form">
-                <h3>{editing ? "Edit duty" : "Add duty"}</h3>
-                <div className="form-grid">
-                  <Field label="Duty or activity">
-                    <input
-                      required
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                    />
-                  </Field>
-                  <Field label="Category">
-                    <select
-                      value={kind}
-                      onChange={(e) => setKind(e.target.value as typeof kind)}
-                    >
-                      {[
-                        "administration",
-                        "research",
-                        "extension",
-                        "advising",
-                        "supervision",
-                        "leave",
-                        "other",
-                      ].map((k) => (
-                        <option key={k}>{k}</option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field label="Credited units">
-                    <input
-                      type="number"
-                      required
-                      min="0"
-                      step="0.01"
-                      value={credits}
-                      onChange={(e) => setCredits(Number(e.target.value))}
-                    />
-                  </Field>
-                  <Field label="Order, approval or source reference">
-                    <input
-                      value={reference}
-                      onChange={(e) => setReference(e.target.value)}
-                    />
-                  </Field>
-                </div>
-                <div className="actions">
-                  <button className="primary">Save duty</button>
-                  {editing && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditing(null);
-                        setName("");
-                        setCredits(0);
-                        setReference("");
-                      }}
-                    >
-                      Cancel edit
+                <fieldset disabled={busy} className="duty-fields">
+                  <legend>{editing ? "Edit duty" : "Add duty"}</legend>
+                  <div className="form-grid">
+                    <Field label="Duty or activity">
+                      <input
+                        required
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                      />
+                    </Field>
+                    <Field label="Category">
+                      <select
+                        value={kind}
+                        onChange={(e) => setKind(e.target.value as typeof kind)}
+                      >
+                        {[
+                          "administration",
+                          "research",
+                          "extension",
+                          "advising",
+                          "supervision",
+                          "leave",
+                          "other",
+                        ].map((k) => (
+                          <option key={k}>{k}</option>
+                        ))}
+                      </select>
+                    </Field>
+                    <Field label="Credited units">
+                      <input
+                        type="number"
+                        required
+                        min="0"
+                        step="0.01"
+                        value={credits}
+                        onChange={(e) => setCredits(Number(e.target.value))}
+                      />
+                    </Field>
+                    <Field label="Order, approval or source reference">
+                      <input
+                        value={reference}
+                        onChange={(e) => setReference(e.target.value)}
+                      />
+                    </Field>
+                  </div>
+                  <div className="actions">
+                    <button className="primary">
+                      {busy ? "Saving…" : "Save duty"}
                     </button>
-                  )}
-                </div>
+                    {editing && (
+                      <button type="button" onClick={clearDraft}>
+                        Cancel edit
+                      </button>
+                    )}
+                  </div>
+                </fieldset>
               </form>
             </>
           ) : (

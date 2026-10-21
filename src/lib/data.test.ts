@@ -8,7 +8,7 @@ import {
   SchedulerDB,
   writeData,
 } from "./storage";
-import { sampleData } from "./sample";
+import { sampleData } from "../../tests/fixtures/academicData";
 import { parseCSV, previewImport, templateCSV } from "./imports";
 import { buildReport, reportTypes } from "./reports";
 describe("backups and persistence", () => {

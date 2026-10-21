@@ -110,8 +110,7 @@ export default function App() {
           </p>
           <button
             onClick={() => {
-              setSettingsTab("data");
-              navigate("settings");
+              navigate("settings", "import");
             }}
           >
             Back up your data ↗
