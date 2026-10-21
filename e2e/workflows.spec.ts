@@ -173,3 +173,57 @@ test("loaded application edits offline and produces a print-ready PDF", async ({
     fullPage: true,
   });
 });
+
+test("BSCA prospectus preview adds all courses safely and persists across refresh", async ({
+  page,
+}) => {
+  await page.goto("#settings");
+  await page.getByRole("button", { name: "Data management & backups" }).click();
+  await page
+    .getByText("Review course list and source notes", { exact: true })
+    .click();
+  await page.getByLabel("Preview year or electives").selectOption("4");
+  await expect(
+    page.getByRole("cell", { name: "BCA197", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("cell", { name: "40", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Add BSCA prospectus sample", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", {
+      name: "BSCA prospectus sample added",
+      exact: true,
+    }),
+  ).toBeDisabled();
+  await page
+    .getByLabel("Academic term", { exact: true })
+    .selectOption("bsca-2018-semester-1");
+  await page.getByRole("link", { name: "Loading & scheduling" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Subject offerings (28)" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /BCA111 · BSCA 1A \(sample\)/ }),
+  ).toBeVisible();
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "Subject offerings (28)" }),
+  ).toBeVisible();
+  await page
+    .getByLabel("Academic term", { exact: true })
+    .selectOption("bsca-2018-semester-2");
+  await expect(
+    page.getByRole("heading", { name: "Subject offerings (23)" }),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "Settings & data" }).click();
+  await page.getByRole("button", { name: "Data management & backups" }).click();
+  await expect(
+    page.getByRole("button", {
+      name: "BSCA prospectus sample added",
+      exact: true,
+    }),
+  ).toBeDisabled();
+});

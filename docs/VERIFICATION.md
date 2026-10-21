@@ -6,9 +6,9 @@ Production build verified locally under `/subject-loading-scheduler/`. No live G
 | --- | --- |
 | TypeScript project check | Passed |
 | ESLint | Passed, no lint warnings |
-| Vitest / React Testing Library | 42 tests passed across 4 files |
+| Vitest / React Testing Library | 48 tests passed across 5 files |
 | Vite production build | Passed, no build warnings |
-| Playwright Chromium on production preview | 4 tests passed |
+| Playwright Chromium on production preview | 5 tests passed |
 | Representative scale fixture | 50 faculty, 300 subjects, 500 offerings/meetings, 100 rooms; validation, availability, utilization and summary projections passed |
 | GitHub Pages subpath | Direct hash navigation and refresh passed locally |
 | Loaded-app offline use | Faculty assignment and Excel download passed with browser networking disabled |
@@ -21,3 +21,7 @@ Unit/integration tests cover resource overlaps, adjacency/containment, multiple 
 Local verification used the bundled Node runtime and an existing Chromium executable; CI installs its own Playwright-matched Chromium. Generated screenshots/PDFs and browser traces live in ignored `test-results/`. No operational dataset is committed. The optional sample fixture contains fictional records only.
 
 Remaining verification boundaries: GitHub-hosted deployment and repository Pages settings have not been exercised; no formal WCAG certification, assistive-technology audit, department-user timing study, or cross-browser test matrix has been completed. Offline refresh is not guaranteed without a service worker. See README for supported calculation assumptions and product limitations.
+
+## BSCA prospectus sample update
+
+Verified the 51 course rows across all eight semester lists and eight suggested elective options. Tests check exceptional NST/OJT component hours, 59 catalog records, 28/23 offerings by planning semester, additive loading alongside existing records, compatible course reuse, collision rejection, duplicate-load prevention, custom-rule preservation, backup roundtrip, browser preview filtering, loading, and persistence after refresh. No real faculty or private operational records were added.

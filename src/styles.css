@@ -1321,3 +1321,42 @@ td .meter {
     margin-bottom: 8px;
   }
 }
+
+.sample-reference {
+  margin: 18px 0;
+  border: 1px solid #dce5dd;
+  border-radius: 7px;
+  padding: 14px;
+}
+.sample-reference summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #24634f;
+  padding: 4px;
+}
+.sample-reference summary:focus-visible {
+  outline: 3px solid #91b8e1;
+  outline-offset: 2px;
+}
+.sample-reference ul {
+  list-style: disc;
+  padding-left: 22px;
+  margin: 16px 0;
+  color: #526b59;
+  font-size: 12px;
+}
+.sample-reference li {
+  margin: 9px 0;
+  line-height: 1.7;
+}
+.sample-reference .field {
+  max-width: 330px;
+  margin-bottom: 18px;
+}
+.sample-reference .table-wrap {
+  max-height: 480px;
+}
+.sample-reference th {
+  position: sticky;
+  top: 0;
+}

@@ -1,3 +1,4 @@
+import { BscaSamplePanel } from "./BscaSamplePanel";
 import { readPreference, writePreference } from "../lib/preferences";
 import { useState } from "react";
 import {
@@ -418,6 +419,7 @@ export function DataManagement({
           </div>
         </div>
       </Panel>
+      <BscaSamplePanel data={data} commit={commit} />
       <Panel title="Optional sample dataset">
         <div className="padded">
           <p>

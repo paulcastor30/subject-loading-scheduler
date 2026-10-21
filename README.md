@@ -1,6 +1,6 @@
 # Subject Loading and Scheduling System (SLSS)
 
-A local-first academic administration application built with React, TypeScript, Vite, Tailwind CSS, Dexie/IndexedDB, and browser-based Excel libraries. No server, account, API key, subscription, or external database is required. The application starts empty; fictional sample data is an explicit opt-in.
+A local-first academic administration application built with React, TypeScript, Vite, Tailwind CSS, Dexie/IndexedDB, and browser-based Excel libraries. No server, account, API key, subscription, or external database is required. The application starts empty; both the BSCA prospectus planning sample and fictional tour data are explicit opt-ins.
 
 ## Run locally
 
@@ -36,6 +36,14 @@ The browser tests run against the **production** build on port 4173. Run `pnpm b
 7. Generate reports, export a full JSON backup, and optionally finalize the semester in Settings. Reopen the semester before changing its offerings or schedules.
 
 For a tour, **Data management & backups → Load fictional sample data** is available only on an empty academic database. All sample names are fictional and explicitly labeled. [Basic user guide](docs/USER_GUIDE.md) covers daily workflows.
+
+## BSCA prospectus sample
+
+Open **Settings & data → Data management & backups → BSCA prospectus sample**. Review the course table and source notes, then choose **Add BSCA prospectus sample**. Select **BSCA sample planning year** in the academic-term header. The sample is added alongside existing records; it does not replace records or workload/scheduling rules. Duplicate loading is blocked; incompatible course codes stop the operation without partial writes. Undo is available in the current session.
+
+This sample transcribes the supplied *Bachelor of Science in Computer Applications* prospectus, **BOR Resolution No. 129, Series of 2018**: 51 curriculum rows across eight semester lists, including four elective slots, plus eight suggested technical electives (59 catalog entries). Two planning terms contain 28 first-semester and 23 second-semester offerings across four illustrative year-level blocks of 30 students. No faculty, rooms, assignments or schedules are invented. The suggested technical electives are options, not eight additional mandatory offerings. Replace elective-slot offerings with selected catalog courses before scheduling.
+
+The sample preserves course-row units and separate lecture/lab hours. The PDF's printed semester/grand totals conflict with its rows; the 51 rows sum to 159 numeric units including NST (153 excluding NST), whereas the printed grand total is 147(153). NST units shown as `(3)` are stored as 3 and retain that notation in the source preview. NST001 has a printed total-hours value of 30 despite lecture 3 / lab 0: the separate component columns are used. BCA197 retains 6 units, lecture 0 / lab 40 hours/week; its source also states 700hrs. These are not faculty credit rules or an instruction to book an internship in a campus laboratory. Confirm departmental treatment of internship, NST and thesis before assignment. Source prerequisite/corequisite and track information is visible in the preview, but is not an enrollment-validation feature. This sample does not claim the 2018 prospectus is the currently approved curriculum.
 
 ## Functional modules
 
@@ -124,6 +132,7 @@ src/
     reports.ts       Deterministic report projections
     useStore.ts      Save state, finalization guard, session undo/redo
     sample.ts        Explicitly fictional optional sample records
+    bscaSample.ts    Prospectus transcription, provenance, safe additive loading
   test/              DOM and IndexedDB test setup
 e2e/                 Production browser workflows
 .github/workflows/   Quality gates and static Pages deployment

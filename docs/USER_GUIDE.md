@@ -6,6 +6,12 @@ In **Settings & data → Academic records & rules**, use Record type to create p
 
 A subject records **course units**, **lecture contact hours per week**, and **lab contact hours per week** separately. Review your department's workload factors before assigning faculty. New faculty load limits are editable.
 
+## Explore the supplied BSCA prospectus
+
+Open **Data management & backups → BSCA prospectus sample**, review the source notes and course list, and click **Add BSCA prospectus sample**. It adds records without replacing your current data or rules. Then select **BSCA sample planning year** in the top bar.
+
+The sample contains 59 catalog records (51 curriculum rows including four elective slots, plus eight elective options), two planning semesters and four illustrative blocks. Its 51 offerings start unassigned and unscheduled. Add your faculty and rooms when ready. Replace each elective-slot offering with the elective you actually selected; do not schedule both. Review internship, NST and thesis loading policy before assignment. The source contains inconsistent printed totals; course-row units and separate lecture/lab columns are preserved, and source notes explain those differences.
+
 ## Assign a class
 
 1. Select the academic term in the top bar.

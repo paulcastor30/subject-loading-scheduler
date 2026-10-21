@@ -50,8 +50,8 @@ export function Dashboard({
       {!data.semesters.length && (
         <div className="alert warning">
           Start with Settings → Records to create an academic year and semester,
-          or load the optional fictional sample under Data management. This
-          workspace starts empty.
+          or add the BSCA prospectus sample under Data management & backups.
+          This workspace starts empty.
         </div>
       )}
       <div className="stats-grid">
