@@ -1,3 +1,4 @@
+import { Form3Report } from "./Form3Report";
 import { useMemo, useState } from "react";
 import type { Data, Entity } from "../lib/model";
 import {
@@ -22,7 +23,9 @@ export function Reports({
     [program, setProgram] = useState(""),
     [busy, setBusy] = useState(false);
   const entity: Entity | null =
-    type.includes("Individual Faculty") || type === "Faculty Weekly Schedule"
+    type.includes("Individual Faculty") ||
+    type === "Faculty Weekly Schedule" ||
+    type === "OVCAA Form 3 Loading Summary"
       ? "faculty"
       : type === "Student Section Weekly Schedule"
         ? "sections"
@@ -56,6 +59,7 @@ export function Reports({
             onChange={(e) => {
               setType(e.target.value as ReportType);
               setResource("");
+              setProgram("");
             }}
           >
             {reportTypes.map((t) => (
@@ -63,14 +67,16 @@ export function Reports({
             ))}
           </select>
         </Field>
-        <Reference
-          data={data}
-          entity="programs"
-          label="Program"
-          value={program}
-          onChange={setProgram}
-          empty="All programs"
-        />
+        {type !== "OVCAA Form 3 Loading Summary" && (
+          <Reference
+            data={data}
+            entity="programs"
+            label="Program"
+            value={program}
+            onChange={setProgram}
+            empty="All programs"
+          />
+        )}
         {entity && (
           <Reference
             data={data}
@@ -106,39 +112,43 @@ export function Reports({
             <p>{facultyLoadNote(data, term, resource)}</p>
           )}
         </header>
-        <Panel title={`${report.rows.length} report records`}>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  {report.headers.map((h) => (
-                    <th key={h}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {report.rows.map((r, i) => (
-                  <tr key={i}>
-                    {r.map((v, j) => (
-                      <td key={j}>{v}</td>
+        {type === "OVCAA Form 3 Loading Summary" ? (
+          <Form3Report data={data} term={term} faculty={resource} />
+        ) : (
+          <Panel title={`${report.rows.length} report records`}>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    {report.headers.map((h) => (
+                      <th key={h}>{h}</th>
                     ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {!report.rows.length && (
-            <Empty title="No matching records">
-              Choose a semester or adjust the report filters.
-            </Empty>
-          )}
-        </Panel>
+                </thead>
+                <tbody>
+                  {report.rows.map((r, i) => (
+                    <tr key={i}>
+                      {r.map((v, j) => (
+                        <td key={j}>{v}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {!report.rows.length && (
+              <Empty title="No matching records">
+                Choose a semester or adjust the report filters.
+              </Empty>
+            )}
+          </Panel>
+        )}
         <p className="report-footnote">
-          Weekly recurring schedules. Credited load uses planned subject contact
-          hours with lecture factor {data.workloadRules[0].lectureFactor} and
-          laboratory factor {data.workloadRules[0].labFactor}. Course units are
-          independent. Room utilization excludes blocked/unavailable time and
-          covers the full selected semester, regardless of program filter.
+          Weekly recurring schedules. Teaching groups use their category factor
+          or an explicit credited-load override; ungrouped offerings use
+          department factors. Other duties are credited separately. Course units
+          are independent. Room utilization excludes blocked/unavailable time
+          and covers the full selected semester, regardless of program filter.
         </p>
       </div>
     </>

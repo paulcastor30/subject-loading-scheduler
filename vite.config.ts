@@ -10,6 +10,13 @@ export default defineConfig({
         manualChunks(id) {
           if (
             id.includes("node_modules") &&
+            ["/react/", "/react-dom/", "/scheduler/"].some((name) =>
+              id.includes(name),
+            )
+          )
+            return "react";
+          if (
+            id.includes("node_modules") &&
             (id.includes("read-excel-file") || id.includes("write-excel-file"))
           )
             return "spreadsheets";

@@ -29,11 +29,15 @@ const defaults: Record<string, unknown> = {
   lectureFactor: 1,
   labFactor: 1,
   day: 0,
+  students: 30,
+  contactHours: 3,
+  factor: 1,
+  credits: 0,
   start: "08:00",
   end: "09:00",
   component: "lecture",
   type: "classroom",
-  kind: "blocked",
+  kind: "administration",
   overload: "error",
   specialization: "",
   days: [0, 1, 2, 3, 4, 5],
@@ -42,7 +46,8 @@ const hints: Record<string, string> = {
   equipment:
     "Comma-separated equipment; subject requirements must match room equipment.",
   specialization: "Comma-separated subject keywords. Advisory only.",
-  maxLoad: "Maximum credited teaching-load units per semester.",
+  maxLoad:
+    "Maximum total credited load per semester, including teaching and other duties.",
   courseUnits:
     "Student academic credit; independent of contact hours and teaching load.",
   lectureHours: "Required weekly lecture contact hours.",
@@ -66,6 +71,11 @@ const numeric = [
   "lectureFactor",
   "labFactor",
   "day",
+  "students",
+  "contactHours",
+  "factor",
+  "credits",
+  "creditedLoad",
 ];
 export function RecordForm({
   data,
@@ -91,7 +101,9 @@ export function RecordForm({
               ? uid()
               : f === "specialization" && entity === "schedulingRules"
                 ? "warning"
-                : (defaults[f] ?? ""),
+                : f === "kind" && entity === "roomAvailability"
+                  ? "blocked"
+                  : (defaults[f] ?? ""),
           ]),
         ),
     ),
@@ -103,7 +115,16 @@ export function RecordForm({
     e.preventDefault();
     setSaving(true);
     setError("");
-    const result = schemas[entity].safeParse(value);
+    const cleaned = { ...value };
+    for (const key of [
+      "groupId",
+      "loadCategoryId",
+      "creditedLoad",
+      "overloadPolicy",
+      "status",
+    ])
+      if (cleaned[key] === "") delete cleaned[key];
+    const result = schemas[entity].safeParse(cleaned);
     if (!result.success) {
       setError(
         result.error.issues
@@ -150,8 +171,8 @@ export function RecordForm({
                 entity={target}
                 label={human(field)}
                 value={String(v ?? "")}
-                onChange={(v) => set(field, v)}
-                required
+                onChange={(v) => set(field, v || undefined)}
+                required={!["groupId", "loadCategoryId"].includes(field)}
               />
             );
           if (field === "days")
@@ -178,23 +199,47 @@ export function RecordForm({
               </fieldset>
             );
           const options =
-            field === "type"
-              ? ["classroom", "laboratory"]
-              : field === "component"
-                ? ["lecture", "lab"]
-                : field === "kind"
-                  ? ["available", "blocked"]
-                  : field === "overload"
-                    ? ["error", "warning"]
-                    : field === "specialization" && entity === "schedulingRules"
-                      ? ["warning", "off"]
-                      : null;
+            field === "status"
+              ? ["", "active", "studyLeave", "proposed"]
+              : field === "type"
+                ? ["classroom", "laboratory"]
+                : field === "component"
+                  ? entity === "loadCategories"
+                    ? ["lecture", "lab", "any"]
+                    : ["lecture", "lab"]
+                  : field === "kind"
+                    ? entity === "loadActivities"
+                      ? [
+                          "administration",
+                          "research",
+                          "extension",
+                          "advising",
+                          "supervision",
+                          "leave",
+                          "other",
+                        ]
+                      : ["available", "blocked"]
+                    : ["overload", "overloadPolicy"].includes(field)
+                      ? field === "overloadPolicy"
+                        ? ["", "error", "warning"]
+                        : ["error", "warning"]
+                      : field === "specialization" &&
+                          entity === "schedulingRules"
+                        ? ["warning", "off"]
+                        : null;
           return (
             <Field key={field} label={human(field)} hint={hints[field]}>
               {options ? (
                 <select
                   value={String(v)}
-                  onChange={(e) => set(field, e.target.value)}
+                  onChange={(e) =>
+                    set(
+                      field,
+                      field === "overloadPolicy" && !e.target.value
+                        ? undefined
+                        : e.target.value,
+                    )
+                  }
                 >
                   {options.map((o) => (
                     <option key={o}>{o}</option>
@@ -229,13 +274,29 @@ export function RecordForm({
                   step={numeric.includes(field) ? "any" : undefined}
                   min={numeric.includes(field) ? 0 : undefined}
                   value={String(v ?? "")}
-                  onChange={(e) => set(field, e.target.value)}
+                  onChange={(e) =>
+                    set(
+                      field,
+                      e.target.value === "" && field === "creditedLoad"
+                        ? undefined
+                        : e.target.value,
+                    )
+                  }
                   required={
                     ![
                       "equipment",
                       "specialization",
                       "reason",
                       "building",
+                      "groupId",
+                      "loadCategoryId",
+                      "creditedLoad",
+                      "creditReason",
+                      "sourceNote",
+                      "reference",
+                      "rank",
+                      "status",
+                      "overloadPolicy",
                     ].includes(field)
                   }
                 />
@@ -246,9 +307,11 @@ export function RecordForm({
       </div>
       {entity === "workloadRules" && (
         <p className="note">
-          Load = planned lecture hours × lecture factor + planned lab hours ×
-          lab factor, once per assigned offering. Course units and actual
-          scheduled hours are reported separately.
+          These are the default credit factors. Separate teaching groups can
+          select a named category or record an explicit credit with its source.
+          Older whole-offering assignments use planned lecture hours × lecture
+          factor + planned lab hours × lab factor, once per offering. Other
+          duties are counted separately.
         </p>
       )}
       <div className="actions">
@@ -378,7 +441,7 @@ export function Records({
                   {fields.map((f) => (
                     <td key={f}>
                       {refs[entity]?.[f]
-                        ? rowName(data, refs[entity]![f], String(r[f]))
+                        ? rowName(data, refs[entity]![f], String(r[f] ?? "—"))
                         : f === "day"
                           ? days[Number(r[f])]
                           : typeof r[f] === "boolean"
@@ -389,7 +452,7 @@ export function Records({
                               ? (r[f] as number[])
                                   .map((i) => days[i].slice(0, 3))
                                   .join(", ")
-                              : String(r[f])}
+                              : String(r[f] ?? "—")}
                     </td>
                   ))}
                   <td className="row-actions">

@@ -12,14 +12,18 @@ Open **Data management & backups → BSCA prospectus sample**, review the source
 
 The sample contains 59 catalog records (51 curriculum rows including four elective slots, plus eight elective options), two planning semesters and four illustrative blocks. Its 51 offerings start unassigned and unscheduled. Add your faculty and rooms when ready. Replace each elective-slot offering with the elective you actually selected; do not schedule both. Review internship, NST and thesis loading policy before assignment. The source contains inconsistent printed totals; course-row units and separate lecture/lab columns are preserved, and source notes explain those differences.
 
+## Start quickly
+
+Use the **Get the semester ready** checklist on Overview. **Start a semester / draft** creates the year and term together. You can copy prior offerings and group structure without copying instructors or meetings. Use different draft names for hiring scenarios. Checklist items open the relevant records screen; **Import previous loading** opens the reviewed Form 3 importer.
+
 ## Assign a class
 
 1. Select the academic term in the top bar.
 2. Open **Loading & scheduling → Guided assignment**.
 3. Add an offering for a subject and student section, or select one from the list.
-4. Choose faculty and click **Assign faculty**. Current credited loads appear below the selector.
-5. Click **Add meeting**, enter a component (lecture/lab), weekday, start/end time, and room, then save. Repeat for every weekly meeting.
-6. Use **Suggest times** to review a few suitable free room/time combinations. Suggestions check existing faculty and section bookings as well as rooms.
+4. For separate components, click **Set up lecture & lab groups**. Each group has an instructor, enrollment, contact hours and credited load. Faculty options show current load; selecting one previews the resulting total. Save each group. Existing simple offerings can still use **Assign faculty**.
+5. Use **Split lab into two** for smaller laboratory groups, then **Schedule this group**. Select a day/time to see available rooms that fit its enrollment. Use **Repeat on other days** to save several weekly meetings together. For existing simple offerings, **Add meeting** still works.
+6. Use **Suggest available times** to review a few suitable free room/time combinations. Suggestions check existing faculty and section bookings as well as rooms.
 
 Changes save after validation. A blocking error appears at the top; the prior saved version stays intact. Missing faculty and incomplete contact hours are review warnings so you can build a schedule in stages.
 
@@ -27,11 +31,21 @@ Changes save after validation. A blocking error appears at the top; the prior sa
 
 Use **Quick edit** for spreadsheet-like editing. Tab moves between day/time/room fields. Save a row with its button or Ctrl/⌘ + Enter; Escape resets its draft. Unsaved rows have a visible label. Save a draft before switching screens.
 
-Use filters to identify a group of offerings for bulk faculty reassignment. Confirm the affected count before applying. Select meeting checkboxes for bulk room/day edits or deletion. An invalid bulk change is rejected as a whole.
+Instructor changes in Quick edit affect the matching group’s meetings. Bulk assignment defaults to filling unassigned groups; clear that option only when you intend to replace existing assignments. Use filters to identify offerings for bulk faculty reassignment. Confirm the affected count before applying. Select meeting checkboxes for bulk room/day edits or deletion. An invalid bulk change is rejected as a whole.
 
 **Weekly timetable** groups classes by weekday. Filter to a faculty member, section, or room; select a class card to open its editor. All timetable changes also have a keyboard-accessible form.
 
 Undo/redo in the header reverses recent saved changes during the session. A browser refresh resets the undo stack, but does not erase saved records.
+
+## Review total faculty load
+
+Open **Faculty loads** to see teaching credits, other duties, totals, limits and preparation counts. Select a faculty member to add or edit duty credits and source/order references. Use a zero-credit **leave** activity for semester-specific study leave. In **Reports**, select **OVCAA Form 3 Loading Summary** for a grouped printable form or Excel export with totals and preparations.
+
+## Import a previous loading form
+
+In Data management, choose **Choose Form 3 workbook**, then the authoritative loading worksheet. Confirm the destination semester and program, course catalog matches, block years and faculty aliases. Course units cannot be taken from faculty credited load; enter missing catalog details explicitly. Review source term labels, which can disagree with filenames.
+
+By default, import **load records only** and finish scheduling afterward. To bring in room bookings, enable meeting import, match room names and confirm capacities/types. Correct malformed times/TBA rooms or exclude rows. Review the row selection, confirm the target, validate, then **Import reviewed loading**. Reported credits keep their source references. Duplicate offerings are rejected; use a new draft for an alternative plan. The file stays on this browser and is not uploaded.
 
 ## Find a room
 
@@ -60,3 +74,7 @@ Download JSON backups often and before finalizing a semester. Store copies outsi
 Records belong to this browser/profile/device. They do not sync. Clearing browser data or losing a device may erase them. A persistent-storage request can reduce eviction but does not guarantee recovery. Use one editing tab; stale writes from another tab are rejected, requiring a reload.
 
 To finalize, edit the semester's **Finalized** checkbox after review and backup. To edit a finalized schedule later, clear that checkbox first.
+
+## Existing data and backups
+
+The update preserves existing simple offerings and browser records. Database version 2 adds teaching groups, load categories and other duty activities. JSON backup version 2 is now exported; version 1 backups still restore. After updating, download a fresh backup. Save visible group/row drafts before switching offerings or pages.

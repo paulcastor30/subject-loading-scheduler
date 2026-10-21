@@ -1,13 +1,34 @@
 import Dexie, { type Table } from "dexie";
-import { dataSchema, emptyData, entities, integrity, type Data } from "./model";
+import {
+  labels as integrityLabels,
+  dataSchema,
+  emptyData,
+  entities,
+  integrity,
+  type Data,
+} from "./model";
 import { validate } from "./engine";
-export const BACKUP_VERSION = 1;
+export const BACKUP_VERSION = 2;
 export class SchedulerDB extends Dexie {
   meta!: Table<{ key: string; value: string }, string>;
   constructor(name = "slss-local-v1") {
     super(name);
     // Version 1 is intentionally normalized. Add upgrade callbacks for future schema changes.
     this.version(1).stores({
+      ...Object.fromEntries(
+        entities
+          .filter(
+            (key) =>
+              !["teachingGroups", "loadCategories", "loadActivities"].includes(
+                key,
+              ),
+          )
+          .map((key) => [key, "id"]),
+      ),
+      history: "id,at",
+      meta: "key",
+    });
+    this.version(2).stores({
       ...Object.fromEntries(entities.map((key) => [key, "id"])),
       history: "id,at",
       meta: "key",
@@ -34,7 +55,18 @@ export async function readData(
   });
 }
 export function checkData(input: unknown): Data {
-  const data = dataSchema.parse(input);
+  const parsed = dataSchema.safeParse(input);
+  if (!parsed.success)
+    throw new Error(
+      parsed.error.issues
+        .slice(0, 12)
+        .map((issue) => {
+          const [entity, index, field] = issue.path;
+          return `${typeof entity === "string" && entity in integrityLabels ? integrityLabels[entity as keyof typeof integrityLabels] : String(entity)}${typeof index === "number" ? ` row ${index + 1}` : ""}${field ? ` · ${String(field)}` : ""}: ${issue.message}`;
+        })
+        .join("\n"),
+    );
+  const data = parsed.data;
   const errors = [
     ...integrity(data),
     ...validate(data)
@@ -80,9 +112,12 @@ export function backup(data: Data) {
 }
 export function restore(source: string): Data {
   const parsed = JSON.parse(source);
-  if (parsed.application !== "SLSS" || parsed.schemaVersion !== BACKUP_VERSION)
+  if (
+    parsed.application !== "SLSS" ||
+    ![1, BACKUP_VERSION].includes(parsed.schemaVersion)
+  )
     throw new Error(
-      "Unsupported backup. Use an SLSS schema version 1 JSON backup.",
+      "Unsupported backup. Use an SLSS schema version 1 or 2 JSON backup.",
     );
   return checkData(parsed.data);
 }
@@ -117,16 +152,34 @@ export function duplicateSemester(
       );
     const offeringId = crypto.randomUUID();
     next.offerings.push({ ...o, id: offeringId, semesterId: targetId });
+    const groupMap = new Map<string, string>();
+    for (const group of data.teachingGroups.filter(
+      (g) => g.offeringId === o.id,
+    )) {
+      const id = crypto.randomUUID();
+      groupMap.set(group.id, id);
+      next.teachingGroups.push({ ...group, id, offeringId });
+    }
     if (includeAssignments) {
       next.assignments.push(
         ...data.assignments
           .filter((a) => a.offeringId === o.id)
-          .map((a) => ({ ...a, id: crypto.randomUUID(), offeringId })),
+          .map((a) => ({
+            ...a,
+            id: crypto.randomUUID(),
+            offeringId,
+            ...(a.groupId ? { groupId: groupMap.get(a.groupId) } : {}),
+          })),
       );
       next.meetings.push(
         ...data.meetings
           .filter((m) => m.offeringId === o.id)
-          .map((m) => ({ ...m, id: crypto.randomUUID(), offeringId })),
+          .map((m) => ({
+            ...m,
+            id: crypto.randomUUID(),
+            offeringId,
+            ...(m.groupId ? { groupId: groupMap.get(m.groupId) } : {}),
+          })),
       );
     }
   }

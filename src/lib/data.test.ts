@@ -16,7 +16,7 @@ describe("backups and persistence", () => {
     expect(restore(backup(sampleData()))).toEqual(sampleData()));
   it("rejects damaged, future, and orphaned backups before replacing anything", () => {
     expect(() => restore("{")).toThrow();
-    expect(() => restore('{"application":"SLSS","schemaVersion":2}')).toThrow(
+    expect(() => restore('{"application":"SLSS","schemaVersion":3}')).toThrow(
       "Unsupported",
     );
     const d = sampleData();

@@ -1,3 +1,4 @@
+import { Form3Import } from "./Form3Import";
 import { BscaSamplePanel } from "./BscaSamplePanel";
 import { readPreference, writePreference } from "../lib/preferences";
 import { useState } from "react";
@@ -26,11 +27,13 @@ import { sampleData } from "../lib/sample";
 import { Badge, ErrorMessage, Field, Panel, Reference } from "./UI";
 export function DataManagement({
   data,
+  term,
   commit,
   replace,
   onError,
 }: {
   data: Data;
+  term: string;
   commit: Commit;
   replace: Commit;
   onError: (s: string) => void;
@@ -172,6 +175,7 @@ export function DataManagement({
           </p>
         </div>
       </Panel>
+      <Form3Import data={data} term={term} commit={commit} />
       <Panel title="Import Excel or CSV">
         <div className="padded">
           <p className="note">

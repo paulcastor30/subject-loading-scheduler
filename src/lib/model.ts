@@ -16,6 +16,7 @@ export const schemas = {
     ...named,
     academicYearId: id,
     finalized: z.boolean().default(false),
+    overloadPolicy: z.enum(["error", "warning"]).optional(),
   }),
   programs: z.object({ ...named, code: text }),
   curricula: z.object({ ...named, programId: id }),
@@ -32,6 +33,8 @@ export const schemas = {
     ...named,
     specialization: z.string().default(""),
     maxLoad: positive,
+    rank: z.string().optional(),
+    status: z.enum(["active", "studyLeave", "proposed"]).optional(),
     active: z.boolean().default(true),
   }),
   sections: z.object({
@@ -46,13 +49,51 @@ export const schemas = {
     subjectId: id,
     sectionId: id,
   }),
-  assignments: z.object({ ...base, offeringId: id, facultyId: id }),
+  teachingGroups: z.object({
+    ...named,
+    offeringId: id,
+    component: z.enum(["lecture", "lab"]),
+    students: z.coerce.number().int().positive(),
+    contactHours: positive,
+    loadCategoryId: z.string().optional(),
+    creditedLoad: positive.optional(),
+    creditReason: z.string().default(""),
+    sourceNote: z.string().default(""),
+  }),
+  loadCategories: z.object({
+    ...named,
+    component: z.enum(["lecture", "lab", "any"]),
+    factor: positive,
+  }),
+  loadActivities: z.object({
+    ...named,
+    semesterId: id,
+    facultyId: id,
+    kind: z.enum([
+      "administration",
+      "research",
+      "extension",
+      "advising",
+      "supervision",
+      "leave",
+      "other",
+    ]),
+    credits: positive,
+    reference: z.string().default(""),
+  }),
+  assignments: z.object({
+    ...base,
+    offeringId: id,
+    facultyId: id,
+    groupId: id.optional(),
+  }),
   meetings: z.object({
     ...base,
     offeringId: id,
     component: z.enum(["lecture", "lab"]),
     roomId: id,
     ...interval,
+    groupId: id.optional(),
   }),
   rooms: z.object({
     ...named,
@@ -91,8 +132,13 @@ export type Row<K extends Entity> = Rows[K][number];
 export type History = { id: string; at: string; description: string };
 export type Data = Rows & { history: History[] };
 const shape = Object.fromEntries(
-  Object.entries(schemas).map(([key, schema]) => [key, z.array(schema)]),
-) as { [K in Entity]: z.ZodArray<(typeof schemas)[K]> };
+  Object.entries(schemas).map(([key, schema]) => [
+    key,
+    ["teachingGroups", "loadCategories", "loadActivities"].includes(key)
+      ? z.array(schema).default([])
+      : z.array(schema),
+  ]),
+) as unknown as { [K in Entity]: z.ZodType<Rows[K]> };
 export const dataSchema = z.object({
   ...shape,
   history: z.array(z.object({ id, at: z.iso.datetime(), description: text })),
@@ -145,6 +191,9 @@ export const labels: Record<Entity, string> = {
   faculty: "Faculty",
   sections: "Student sections",
   offerings: "Subject offerings",
+  teachingGroups: "Lecture and lab groups",
+  loadCategories: "Load credit categories",
+  loadActivities: "Other faculty duties",
   assignments: "Teaching assignments",
   meetings: "Class meetings",
   rooms: "Rooms",
@@ -161,6 +210,21 @@ export function offeringName(data: Data, offeringId: string): string {
 }
 export function rowName(data: Data, entity: Entity, recordId: string): string {
   if (entity === "offerings") return offeringName(data, recordId);
+  if (entity === "teachingGroups") {
+    const group = data.teachingGroups.find((g) => g.id === recordId);
+    return group
+      ? `${offeringName(data, group.offeringId)} · ${group.name}`
+      : "—";
+  }
+  if (entity === "subjects") {
+    const s = data.subjects.find((s) => s.id === recordId);
+    if (
+      s &&
+      data.subjects.filter((v) => v.code.toLowerCase() === s.code.toLowerCase())
+        .length > 1
+    )
+      return `${s.code} · ${s.name} · ${data.curricula.find((c) => c.id === s.curriculumId)?.name ?? "Catalog"}`;
+  }
   const row = (
     data[entity] as { id: string; name?: string; code?: string }[]
   ).find((r) => r.id === recordId);
@@ -176,8 +240,18 @@ export const refs: Partial<Record<Entity, Record<string, Entity>>> = {
     subjectId: "subjects",
     sectionId: "sections",
   },
-  assignments: { offeringId: "offerings", facultyId: "faculty" },
-  meetings: { offeringId: "offerings", roomId: "rooms" },
+  teachingGroups: { offeringId: "offerings", loadCategoryId: "loadCategories" },
+  loadActivities: { semesterId: "semesters", facultyId: "faculty" },
+  assignments: {
+    offeringId: "offerings",
+    facultyId: "faculty",
+    groupId: "teachingGroups",
+  },
+  meetings: {
+    offeringId: "offerings",
+    roomId: "rooms",
+    groupId: "teachingGroups",
+  },
   facultyAvailability: { facultyId: "faculty" },
   roomAvailability: { roomId: "rooms" },
 };
@@ -191,6 +265,7 @@ export function integrity(data: Data): string[] {
       ids.add(row.id);
       for (const [field, target] of Object.entries(refs[entity] ?? {})) {
         const value = (row as unknown as Record<string, unknown>)[field];
+        if (value === undefined || value === "") continue;
         if (!data[target].some((r) => r.id === value))
           errors.push(`${labels[entity]}: missing ${target} reference.`);
       }
@@ -201,7 +276,7 @@ export function integrity(data: Data): string[] {
   for (const entity of ["workloadRules", "schedulingRules"] as const)
     if (data[entity].length !== 1)
       errors.push(`Exactly one ${labels[entity].toLowerCase()} is required.`);
-  for (const entity of ["programs", "subjects", "rooms"] as const) {
+  for (const entity of ["programs", "rooms"] as const) {
     const codes = data[entity].map((r) => r.code.toLowerCase());
     if (new Set(codes).size !== codes.length)
       errors.push(`${labels[entity]}: codes must be unique.`);
@@ -230,8 +305,52 @@ export function integrity(data: Data): string[] {
         "Offering subject curriculum and section must belong to the same program.",
       );
   }
-  const assigned = data.assignments.map((a) => a.offeringId);
+  const subjectKeys = data.subjects.map(
+    (s) => `${s.curriculumId}|${s.code.toLowerCase()}`,
+  );
+  if (new Set(subjectKeys).size !== subjectKeys.length)
+    errors.push("Subject codes must be unique within a curriculum.");
+  for (const group of data.teachingGroups) {
+    if (group.creditedLoad !== undefined && !group.creditReason.trim())
+      errors.push(
+        `${group.name}: give a reason or source for the credited load override.`,
+      );
+    const category = data.loadCategories.find(
+      (c) => c.id === group.loadCategoryId,
+    );
+    if (
+      category &&
+      category.component !== "any" &&
+      category.component !== group.component
+    )
+      errors.push(
+        `${group.name}: choose a load category for ${group.component}.`,
+      );
+  }
+  for (const row of [...data.assignments, ...data.meetings]) {
+    const groups = data.teachingGroups.filter(
+      (g) => g.offeringId === row.offeringId,
+    );
+    const group = groups.find((g) => g.id === row.groupId);
+    if (
+      row.groupId &&
+      (!group || ("component" in row && row.component !== group.component))
+    )
+      errors.push(
+        "Assignment or meeting does not match its lecture/lab group.",
+      );
+    if (groups.length && !row.groupId)
+      errors.push("Choose a lecture/lab group for this assignment or meeting.");
+  }
+  const groupKeys = data.teachingGroups.map(
+    (g) => `${g.offeringId}|${g.name.toLowerCase()}`,
+  );
+  if (new Set(groupKeys).size !== groupKeys.length)
+    errors.push("Group names must be unique within an offering.");
+  const assigned = data.assignments.map(
+    (a) => `${a.offeringId}|${a.groupId ?? ""}`,
+  );
   if (new Set(assigned).size !== assigned.length)
-    errors.push("An offering can have only one teaching assignment.");
+    errors.push("A lecture/lab group can have only one teaching assignment.");
   return [...new Set(errors)];
 }

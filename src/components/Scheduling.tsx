@@ -1,3 +1,11 @@
+import { GroupWorkspace } from "./GroupWorkspace";
+import {
+  assignOfferingFaculty,
+  enableGroups,
+  meetingAssignment,
+  offeringComplete,
+  groupLabel,
+} from "../lib/loading";
 import { useEffect, useMemo, useState } from "react";
 import { days, offeringName, uid, type Data, type Row } from "../lib/model";
 import { suggestions, validate, workload } from "../lib/engine";
@@ -35,10 +43,7 @@ export function Timetable({
               .sort((a, b) => a.start.localeCompare(b.start))
               .map((m) => {
                 const faculty = data.faculty.find(
-                  (f) =>
-                    f.id ===
-                    data.assignments.find((a) => a.offeringId === m.offeringId)
-                      ?.facultyId,
+                  (f) => f.id === meetingAssignment(data, m)?.facultyId,
                 );
                 const content = (
                   <>
@@ -47,6 +52,7 @@ export function Timetable({
                     </span>
                     <strong>{offeringName(data, m.offeringId)}</strong>
                     <span>
+                      {groupLabel(data, m.groupId)} ·{" "}
                       {m.component === "lab" ? "Laboratory" : "Lecture"} ·{" "}
                       {data.rooms.find((r) => r.id === m.roomId)?.code}
                     </span>
@@ -91,7 +97,11 @@ function QuickRow({
   onSelect: () => void;
 }) {
   const [draft, setDraft] = useState(meeting);
-  const changed = JSON.stringify(draft) !== JSON.stringify(meeting);
+  const assignment = meetingAssignment(data, meeting);
+  const [faculty, setFaculty] = useState(assignment?.facultyId ?? "");
+  const changed =
+    JSON.stringify(draft) !== JSON.stringify(meeting) ||
+    faculty !== (assignment?.facultyId ?? "");
   const set = (field: string, value: unknown) =>
     setDraft((d) => ({ ...d, [field]: value }));
   async function save() {
@@ -99,6 +109,21 @@ function QuickRow({
       ...data,
       meetings: data.meetings.map((m) => (m.id === meeting.id ? draft : m)),
     };
+    if (faculty !== (assignment?.facultyId ?? "")) {
+      next.assignments = next.assignments.filter(
+        (a) =>
+          !(
+            a.offeringId === meeting.offeringId && a.groupId === meeting.groupId
+          ),
+      );
+      if (faculty)
+        next.assignments.push({
+          id: assignment?.id ?? uid(),
+          offeringId: meeting.offeringId,
+          groupId: meeting.groupId,
+          facultyId: faculty,
+        });
+    }
     await commit(
       next,
       `Quick edited ${offeringName(data, meeting.offeringId)}`,
@@ -111,7 +136,10 @@ function QuickRow({
           e.preventDefault();
           void save();
         }
-        if (e.key === "Escape") setDraft(meeting);
+        if (e.key === "Escape") {
+          setDraft(meeting);
+          setFaculty(assignment?.facultyId ?? "");
+        }
       }}
     >
       <td>
@@ -124,7 +152,23 @@ function QuickRow({
       </td>
       <td>
         <strong>{offeringName(data, meeting.offeringId)}</strong>
-        <small className="block">{meeting.component}</small>
+        <small className="block">
+          {meeting.component} · {groupLabel(data, meeting.groupId)}
+        </small>
+      </td>
+      <td>
+        <select
+          aria-label="Meeting faculty"
+          value={faculty}
+          onChange={(e) => setFaculty(e.target.value)}
+        >
+          <option value="">Unassigned</option>
+          {data.faculty.map((f) => (
+            <option key={f.id} value={f.id}>
+              {f.name}
+            </option>
+          ))}
+        </select>
       </td>
       <td>
         <select
@@ -210,6 +254,7 @@ export function Scheduling({
     [bulkFaculty, setBulkFaculty] = useState(""),
     [bulkRoom, setBulkRoom] = useState(""),
     [bulkDay, setBulkDay] = useState("");
+  const [fillUnassigned, setFillUnassigned] = useState(true);
   const [component, setComponent] = useState<"lecture" | "lab">("lecture"),
     [duration, setDuration] = useState(60),
     [showSuggestions, setShowSuggestions] = useState(false);
@@ -237,8 +282,7 @@ export function Scheduling({
             data.meetings.some(
               (m) => m.offeringId === o.id && m.roomId === room,
             )) &&
-          (!onlyUnassigned ||
-            !data.assignments.some((a) => a.offeringId === o.id)) &&
+          (!onlyUnassigned || !offeringComplete(data, o.id)) &&
           offeringName(data, o.id).toLowerCase().includes(search.toLowerCase()),
       ),
     [
@@ -255,24 +299,43 @@ export function Scheduling({
   );
   const ids = new Set(offerings.map((o) => o.id));
   const meetings = data.meetings.filter(
-    (m) => ids.has(m.offeringId) && (!room || m.roomId === room),
+    (m) =>
+      ids.has(m.offeringId) &&
+      (!room || m.roomId === room) &&
+      (!faculty || meetingAssignment(data, m)?.facultyId === faculty),
   );
   const activeOffering = data.offerings.find(
     (o) => o.id === offeringId && o.semesterId === term,
   );
   const assigned = data.assignments.find((a) => a.offeringId === offeringId);
   const issues = useMemo(() => validate(data, term), [data, term]);
-  async function assign(ids: string[], facultyId: string) {
+  async function assign(
+    ids: string[],
+    facultyId: string,
+    onlyUnassigned = false,
+  ) {
     if (!ids.length || !facultyId) return;
-    const next = structuredClone(data);
-    next.assignments = next.assignments.filter(
-      (a) => !ids.includes(a.offeringId),
+    await commit(
+      assignOfferingFaculty(data, ids, facultyId, onlyUnassigned),
+      `Assigned faculty to ${ids.length} filtered offering(s)`,
     );
-    next.assignments.push(
-      ...ids.map((offeringId) => ({ id: uid(), offeringId, facultyId })),
-    );
-    await commit(next, `Assigned faculty to ${ids.length} offering(s)`);
   }
+  const bulkTargetCount = offerings.reduce((sum, o) => {
+    const groups = data.teachingGroups.filter((g) => g.offeringId === o.id);
+    return (
+      sum +
+      (groups.length
+        ? groups.filter(
+            (g) =>
+              !fillUnassigned ||
+              !data.assignments.some((a) => a.groupId === g.id),
+          ).length
+        : !fillUnassigned ||
+            !data.assignments.some((a) => a.offeringId === o.id)
+          ? 1
+          : 0)
+    );
+  }, 0);
   async function saveMeeting(row: Record<string, unknown>) {
     const next = structuredClone(data),
       m = row as unknown as Row<"meetings">;
@@ -333,50 +396,56 @@ export function Scheduling({
             onChange={(e) => setSearch(e.target.value)}
           />
         </Field>
-        <Reference
-          data={data}
-          entity="programs"
-          label="Program"
-          value={program}
-          onChange={setProgram}
-          empty="All programs"
-        />
-        <Reference
-          data={data}
-          entity="faculty"
-          label="Faculty"
-          value={faculty}
-          onChange={setFaculty}
-          empty="All faculty"
-        />
-        <Reference
-          data={data}
-          entity="sections"
-          label="Section"
-          value={section}
-          onChange={setSection}
-          empty="All sections"
-        />
-        <Reference
-          data={data}
-          entity="subjects"
-          label="Subject"
-          value={subject}
-          onChange={setSubject}
-          empty="All subjects"
-        />
-        <Reference
-          data={data}
-          entity="rooms"
-          label="Room"
-          value={room}
-          onChange={setRoom}
-          empty="All rooms"
-        />
+        <details className="filter-disclosure">
+          <summary>More filters</summary>
+          <div className="toolbar wrap">
+            {" "}
+            <Reference
+              data={data}
+              entity="programs"
+              label="Program"
+              value={program}
+              onChange={setProgram}
+              empty="All programs"
+            />
+            <Reference
+              data={data}
+              entity="faculty"
+              label="Faculty"
+              value={faculty}
+              onChange={setFaculty}
+              empty="All faculty"
+            />
+            <Reference
+              data={data}
+              entity="sections"
+              label="Section"
+              value={section}
+              onChange={setSection}
+              empty="All sections"
+            />
+            <Reference
+              data={data}
+              entity="subjects"
+              label="Subject"
+              value={subject}
+              onChange={setSubject}
+              empty="All subjects"
+            />
+            <Reference
+              data={data}
+              entity="rooms"
+              label="Room"
+              value={room}
+              onChange={setRoom}
+              empty="All rooms"
+            />
+          </div>
+        </details>
       </div>
       {mode === "guided" && (
         <>
-          <div className="split">
+          <div className="split scheduling-split">
             <Panel
               title={`Subject offerings (${offerings.length})`}
               action={
@@ -419,8 +488,16 @@ export function Scheduling({
                           }
                         </small>
                       </span>
-                      <Badge tone={f ? "green" : "amber"}>
-                        {f ? f.name : "Unassigned"}
+                      <Badge
+                        tone={offeringComplete(data, o.id) ? "green" : "amber"}
+                      >
+                        {offeringComplete(data, o.id)
+                          ? data.teachingGroups.some(
+                              (g) => g.offeringId === o.id,
+                            )
+                            ? "Groups assigned"
+                            : f?.name
+                          : "Needs faculty"}
                       </Badge>
                     </button>
                   );
@@ -438,165 +515,224 @@ export function Scheduling({
                   ? offeringName(data, offeringId)
                   : "Assignment workspace"
               }
+              action={
+                activeOffering && (
+                  <button
+                    disabled={
+                      !offerings.some(
+                        (o) =>
+                          o.id !== offeringId &&
+                          (!offeringComplete(data, o.id) ||
+                            issues.some(
+                              (i) =>
+                                i.offeringId === o.id &&
+                                i.code === "contact-hours",
+                            )),
+                      )
+                    }
+                    onClick={() => {
+                      const next = offerings.find(
+                        (o) =>
+                          o.id !== offeringId &&
+                          (!offeringComplete(data, o.id) ||
+                            issues.some(
+                              (i) =>
+                                i.offeringId === o.id &&
+                                i.code === "contact-hours",
+                            )),
+                      );
+                      if (next) {
+                        setOfferingId(next.id);
+                        setFacultyId(
+                          data.assignments.find((a) => a.offeringId === next.id)
+                            ?.facultyId ?? "",
+                        );
+                        setShowSuggestions(false);
+                      }
+                    }}
+                  >
+                    Next offering needing work →
+                  </button>
+                )
+              }
             >
               {activeOffering ? (
-                <div className="padded">
-                  <p className="note">
-                    Choose faculty, then add one or more lecture and laboratory
-                    meetings. Valid changes save locally.
-                  </p>
-                  <Reference
+                data.teachingGroups.some((g) => g.offeringId === offeringId) ? (
+                  <GroupWorkspace
                     data={data}
-                    entity="faculty"
-                    label="Faculty member"
-                    value={facultyId}
-                    onChange={setFacultyId}
-                    empty="Choose faculty"
+                    offeringId={offeringId}
+                    commit={commit}
                   />
-                  <div className="faculty-hints">
-                    {data.faculty
-                      .filter((f) => f.active)
-                      .map((f) => (
-                        <span key={f.id}>
-                          {f.name}:{" "}
-                          <strong>
-                            {workload(data, f.id, term)} / {f.maxLoad}
-                          </strong>{" "}
-                          units
-                        </span>
-                      ))}
-                  </div>
-                  <div className="actions">
+                ) : (
+                  <div className="padded">
                     <button
-                      className="primary"
-                      disabled={!facultyId}
-                      onClick={() => void assign([offeringId], facultyId)}
-                    >
-                      {assigned ? "Update faculty" : "Assign faculty"}
-                    </button>
-                    {assigned && (
-                      <button
-                        onClick={() =>
-                          void commit(
-                            {
-                              ...data,
-                              assignments: data.assignments.filter(
-                                (a) => a.offeringId !== offeringId,
-                              ),
-                            },
-                            `Unassigned ${offeringName(data, offeringId)}`,
-                          )
-                        }
-                      >
-                        Unassign
-                      </button>
-                    )}
-                  </div>
-                  <hr />
-                  <div className="panel-heading">
-                    <h3>Weekly meetings</h3>
-                    <button
+                      className="setup-groups"
                       onClick={() =>
-                        setMeeting({
-                          id: uid(),
-                          offeringId,
-                          component: "lecture",
-                          day: 0,
-                          start: "08:00",
-                          end: "09:00",
-                          roomId: "",
-                        })
+                        void commit(
+                          enableGroups(data, offeringId),
+                          "Set up separate lecture and lab groups",
+                        )
                       }
                     >
-                      + Add meeting
+                      Set up lecture & lab groups →
                     </button>
-                  </div>
-                  {data.meetings
-                    .filter((m) => m.offeringId === offeringId)
-                    .map((m) => (
-                      <div className="meeting-row" key={m.id}>
-                        <span>
-                          <strong>
-                            {days[m.day]} {m.start}–{m.end}
-                          </strong>
-                          <small>
-                            {m.component} ·{" "}
-                            {data.rooms.find((r) => r.id === m.roomId)?.code}
-                          </small>
-                        </span>
-                        <div className="actions">
-                          <button onClick={() => setMeeting({ ...m })}>
-                            Edit
-                          </button>
+                    <p className="note">
+                      Choose faculty, then add one or more lecture and
+                      laboratory meetings. Valid changes save locally.
+                    </p>
+                    <Reference
+                      data={data}
+                      entity="faculty"
+                      label="Faculty member"
+                      value={facultyId}
+                      onChange={setFacultyId}
+                      empty="Choose faculty"
+                    />
+                    <div className="faculty-hints">
+                      {data.faculty
+                        .filter((f) => f.active)
+                        .map((f) => (
+                          <span key={f.id}>
+                            {f.name}:{" "}
+                            <strong>
+                              {workload(data, f.id, term)} / {f.maxLoad}
+                            </strong>{" "}
+                            units
+                          </span>
+                        ))}
+                    </div>
+                    <div className="actions">
+                      <button
+                        className="primary"
+                        disabled={!facultyId}
+                        onClick={() => void assign([offeringId], facultyId)}
+                      >
+                        {assigned ? "Update faculty" : "Assign faculty"}
+                      </button>
+                      {assigned && (
+                        <button
+                          onClick={() =>
+                            void commit(
+                              {
+                                ...data,
+                                assignments: data.assignments.filter(
+                                  (a) => a.offeringId !== offeringId,
+                                ),
+                              },
+                              `Unassigned ${offeringName(data, offeringId)}`,
+                            )
+                          }
+                        >
+                          Unassign
+                        </button>
+                      )}
+                    </div>
+                    <hr />
+                    <div className="panel-heading">
+                      <h3>Weekly meetings</h3>
+                      <button
+                        onClick={() =>
+                          setMeeting({
+                            id: uid(),
+                            offeringId,
+                            component: "lecture",
+                            day: 0,
+                            start: "08:00",
+                            end: "09:00",
+                            roomId: "",
+                          })
+                        }
+                      >
+                        + Add meeting
+                      </button>
+                    </div>
+                    {data.meetings
+                      .filter((m) => m.offeringId === offeringId)
+                      .map((m) => (
+                        <div className="meeting-row" key={m.id}>
+                          <span>
+                            <strong>
+                              {days[m.day]} {m.start}–{m.end}
+                            </strong>
+                            <small>
+                              {m.component} ·{" "}
+                              {data.rooms.find((r) => r.id === m.roomId)?.code}
+                            </small>
+                          </span>
+                          <div className="actions">
+                            <button onClick={() => setMeeting({ ...m })}>
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => setMeeting({ ...m, id: uid() })}
+                            >
+                              Duplicate
+                            </button>
+                            <button
+                              className="danger-text"
+                              onClick={() => void removeMeeting(m.id)}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    <hr />
+                    <h3>Find a suitable schedule</h3>
+                    <div className="toolbar">
+                      <Field label="Component">
+                        <select
+                          value={component}
+                          onChange={(e) => {
+                            setComponent(e.target.value as "lecture" | "lab");
+                            setShowSuggestions(false);
+                          }}
+                        >
+                          <option value="lecture">Lecture</option>
+                          <option value="lab">Laboratory</option>
+                        </select>
+                      </Field>
+                      <Field label="Duration (minutes)">
+                        <input
+                          type="number"
+                          min="15"
+                          max="720"
+                          step="15"
+                          value={duration}
+                          onChange={(e) => {
+                            setDuration(Number(e.target.value));
+                            setShowSuggestions(false);
+                          }}
+                        />
+                      </Field>
+                      <button
+                        disabled={duration < 15 || duration > 720}
+                        onClick={() => setShowSuggestions(true)}
+                      >
+                        Suggest times
+                      </button>
+                    </div>
+                    {showSuggestions &&
+                      (recommendations.length ? (
+                        recommendations.map((m, i) => (
                           <button
+                            className="suggestion"
+                            key={i}
                             onClick={() => setMeeting({ ...m, id: uid() })}
                           >
-                            Duplicate
+                            {days[m.day]} {m.start}–{m.end} ·{" "}
+                            {data.rooms.find((r) => r.id === m.roomId)?.code}
+                            <span>Review →</span>
                           </button>
-                          <button
-                            className="danger-text"
-                            onClick={() => void removeMeeting(m.id)}
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  <hr />
-                  <h3>Find a suitable schedule</h3>
-                  <div className="toolbar">
-                    <Field label="Component">
-                      <select
-                        value={component}
-                        onChange={(e) => {
-                          setComponent(e.target.value as "lecture" | "lab");
-                          setShowSuggestions(false);
-                        }}
-                      >
-                        <option value="lecture">Lecture</option>
-                        <option value="lab">Laboratory</option>
-                      </select>
-                    </Field>
-                    <Field label="Duration (minutes)">
-                      <input
-                        type="number"
-                        min="15"
-                        max="720"
-                        step="15"
-                        value={duration}
-                        onChange={(e) => {
-                          setDuration(Number(e.target.value));
-                          setShowSuggestions(false);
-                        }}
-                      />
-                    </Field>
-                    <button
-                      disabled={duration < 15 || duration > 720}
-                      onClick={() => setShowSuggestions(true)}
-                    >
-                      Suggest times
-                    </button>
+                        ))
+                      ) : (
+                        <p className="note">
+                          No valid slots found. Review availability, faculty
+                          load, or try a shorter meeting.
+                        </p>
+                      ))}
                   </div>
-                  {showSuggestions &&
-                    (recommendations.length ? (
-                      recommendations.map((m, i) => (
-                        <button
-                          className="suggestion"
-                          key={i}
-                          onClick={() => setMeeting({ ...m, id: uid() })}
-                        >
-                          {days[m.day]} {m.start}–{m.end} ·{" "}
-                          {data.rooms.find((r) => r.id === m.roomId)?.code}
-                          <span>Review →</span>
-                        </button>
-                      ))
-                    ) : (
-                      <p className="note">
-                        No valid slots found. Review availability, faculty load,
-                        or try a shorter meeting.
-                      </p>
-                    ))}
-                </div>
+                )
               ) : (
                 <Empty title="Select an offering">
                   Choose a subject and section on the left to assign faculty and
@@ -612,10 +748,18 @@ export function Scheduling({
           <Panel title="Bulk faculty assignment">
             <div className="padded">
               <p>
-                Apply to the {offerings.length} offerings matching the filters
-                above. This replaces existing faculty assignments after
-                validation.
+                {bulkTargetCount} assignment targets in {offerings.length}{" "}
+                filtered offerings. Fill missing assignments first, or
+                explicitly choose to replace existing ones.
               </p>
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={fillUnassigned}
+                  onChange={(e) => setFillUnassigned(e.target.checked)}
+                />
+                Fill unassigned groups only
+              </label>
               <div className="toolbar">
                 <Reference
                   data={data}
@@ -626,16 +770,17 @@ export function Scheduling({
                 />
                 <button
                   className="primary"
-                  disabled={!bulkFaculty || !offerings.length}
+                  disabled={!bulkFaculty || !bulkTargetCount}
                   onClick={() => {
                     if (
                       confirm(
-                        `Assign this faculty member to ${offerings.length} filtered offerings?`,
+                        `Assign this faculty member to ${bulkTargetCount} ${fillUnassigned ? "unassigned" : "selected"} groups or whole offerings?`,
                       )
                     )
                       void assign(
                         offerings.map((o) => o.id),
                         bulkFaculty,
+                        fillUnassigned,
                       );
                   }}
                 >
@@ -649,6 +794,7 @@ export function Scheduling({
               <p className="note">
                 Tab between cells. Save each row or press Ctrl/⌘ + Enter. Escape
                 resets the row. Each save is validated before it is stored.
+                Faculty changes apply to all meetings for the same group.
               </p>
               <div className="toolbar wrap">
                 <Badge>
@@ -743,7 +889,8 @@ export function Scheduling({
                         }
                       />
                     </th>
-                    <th>Offering</th>
+                    <th>Offering / group</th>
+                    <th>Faculty</th>
                     <th>Day</th>
                     <th>Start</th>
                     <th>End</th>
@@ -754,7 +901,7 @@ export function Scheduling({
                 <tbody>
                   {meetings.map((m) => (
                     <QuickRow
-                      key={`${m.id}-${JSON.stringify(m)}`}
+                      key={`${m.id}-${JSON.stringify(m)}-${meetingAssignment(data, m)?.facultyId ?? ""}`}
                       data={data}
                       meeting={m}
                       commit={commit}

@@ -227,3 +227,201 @@ test("BSCA prospectus preview adds all courses safely and persists across refres
     }),
   ).toBeDisabled();
 });
+
+test("separate lab groups, parallel rooms, faculty duties and Form 3 report", async ({
+  page,
+}, testInfo) => {
+  await page.goto("#settings");
+  await page.getByRole("button", { name: "Data management & backups" }).click();
+  await page
+    .getByRole("button", { name: "Load fictional sample data" })
+    .click();
+  await expect(
+    page.getByText("Sample loaded.", { exact: false }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Academic records & rules" }).click();
+  await page.getByLabel("Record type", { exact: true }).selectOption("rooms");
+  await page.getByRole("button", { name: "+ Add record" }).click();
+  await page.getByLabel("Name", { exact: true }).fill("Second laboratory");
+  await page.getByLabel("Code", { exact: true }).fill("LAB 2");
+  await page.getByLabel("Building", { exact: true }).fill("Example building");
+  await page.getByLabel("Type", { exact: true }).selectOption("laboratory");
+  await page.getByLabel("Capacity", { exact: true }).fill("20");
+  await page.getByRole("button", { name: "Save record" }).click();
+  await page.getByRole("link", { name: "Loading & scheduling" }).click();
+  await page.getByRole("button", { name: /CS 201 · BSCS 2A/ }).click();
+  await page
+    .getByRole("button", { name: "Set up lecture & lab groups →" })
+    .click();
+  const labA = page
+    .getByRole("article")
+    .filter({ has: page.getByRole("heading", { name: "Lab A", exact: true }) });
+  await labA.getByRole("button", { name: "Split lab into two" }).click();
+  await expect(labA.getByLabel("Students in this group")).toHaveValue("14");
+  await labA.getByLabel("Faculty for this group").selectOption("fac1");
+  await labA.getByRole("button", { name: "Save group" }).click();
+  await expect(labA.getByRole("button", { name: "Save group" })).toBeDisabled();
+  const labB = page
+    .getByRole("article")
+    .filter({ has: page.getByRole("heading", { name: "Lab 2", exact: true }) });
+  await labB.getByLabel("Faculty for this group").selectOption("fac2");
+  await labB.getByRole("button", { name: "Save group" }).click();
+  await expect(labB.getByRole("button", { name: "Save group" })).toBeDisabled();
+  for (const lab of [labA, labB]) {
+    await lab.getByRole("button", { name: "Schedule this group" }).click();
+    await lab.getByLabel("Day", { exact: true }).selectOption("1");
+    await lab.getByLabel("Start time", { exact: true }).fill("08:00");
+    await lab.getByLabel("End time", { exact: true }).fill("11:00");
+  }
+  await labA.getByLabel("Available room").selectOption("room2");
+  await labA.getByRole("button", { name: "Save meeting", exact: true }).click();
+  await expect(
+    labA.getByText("Tuesday 08:00–11:00", { exact: true }),
+  ).toBeVisible();
+  await labB
+    .getByLabel("Available room")
+    .selectOption({ label: "LAB 2 · 20 seats" });
+  await labB.getByRole("button", { name: "Save meeting", exact: true }).click();
+  await expect(
+    labB.getByText("Tuesday 08:00–11:00", { exact: true }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath("group-scheduling.png"),
+    fullPage: true,
+  });
+  await page.getByRole("link", { name: "Faculty loads", exact: true }).click();
+  await page.getByLabel("Faculty member", { exact: true }).selectOption("fac2");
+  await page.getByLabel("Duty or activity").fill("Example adviser duty");
+  await page.getByLabel("Credited units", { exact: true }).fill("2");
+  await page
+    .getByLabel("Order, approval or source reference")
+    .fill("Example order");
+  await page.getByRole("button", { name: "Save duty" }).click();
+  await expect(
+    page.getByText("Example adviser duty · 2.00 units"),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "Reports", exact: true }).click();
+  await page
+    .getByLabel("Report", { exact: true })
+    .selectOption("OVCAA Form 3 Loading Summary");
+  await page.getByLabel("Faculty member", { exact: true }).selectOption("fac2");
+  await expect(
+    page.getByText("Total faculty load", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("cell", { name: "5.00", exact: true }),
+  ).toBeVisible();
+  const excel = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export Excel" }).click();
+  expect((await excel).suggestedFilename()).toContain("OVCAA-Form-3");
+  await page.reload();
+  await page
+    .getByLabel("Report", { exact: true })
+    .selectOption("OVCAA Form 3 Loading Summary");
+  await page.getByLabel("Faculty member", { exact: true }).selectOption("fac2");
+  await expect(
+    page.getByRole("cell", { name: "Example adviser duty", exact: true }),
+  ).toBeVisible();
+});
+
+test("semester setup and selected Form 3 import with reviewed group credits", async ({
+  page,
+}) => {
+  const { default: writeXlsxFile } = await import("write-excel-file/node");
+  const matrix = [
+    ["Example institution"],
+    ["First semester 2026–2027"],
+    [
+      "NAME OF FACULTY",
+      "Course No./Section/Adm. Function",
+      "SCHEDULE",
+      "DAY",
+      "Room Assignment",
+      "Academic /Adm.Load",
+      "OVERLOAD",
+      "No. of Students",
+    ],
+    [
+      "Example Teacher (Lecturer)",
+      "BCA111-B181",
+      "8:00AM - 10:00AM",
+      "M",
+      "ROOM A",
+      2,
+      null,
+      30,
+    ],
+    [
+      null,
+      "BCA111-B181 (LAB)",
+      "1:00PM - 4:00PM",
+      "T",
+      "LAB A",
+      2.55,
+      null,
+      15,
+    ],
+    [
+      null,
+      "BCA111-B181.1 (LAB)",
+      "1:00PM - 4:00PM",
+      "Th",
+      "LAB A",
+      2.55,
+      null,
+      15,
+    ],
+    [null, "Example adviser duty", "-", "-", "-", 2, null, "-"],
+    [null, "TOTAL FACULTY LOAD", null, null, null, 9.1],
+  ];
+  const buffer = await writeXlsxFile(
+    matrix.map((row) =>
+      row.map((value) => (value === null ? null : { value })),
+    ),
+    { buffer: true },
+  );
+  await page.goto("");
+  await page.getByLabel("Academic year", { exact: true }).fill("2026–2027");
+  await page.getByRole("button", { name: "Create semester workspace" }).click();
+  await expect(page.getByLabel("Academic term", { exact: true })).toContainText(
+    "2026–2027",
+  );
+  await page.getByRole("button", { name: "Import previous loading" }).click();
+  await page.getByLabel("Choose Form 3 workbook").setInputFiles({
+    name: "example-form-3.xlsx",
+    mimeType:
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    buffer,
+  });
+  await page
+    .getByLabel("Loading worksheet", { exact: true })
+    .selectOption({ index: 1 });
+  await page.getByLabel("Course title BCA111").fill("Example computing course");
+  await page.getByLabel("Course units BCA111").fill("3");
+  await page.getByLabel("Year level for B181").selectOption("1");
+  await page.getByLabel(/I reviewed this worksheet/).check();
+  await page
+    .getByRole("button", { name: "Validate and preview loading" })
+    .click();
+  await expect(page.getByText("Ready to add:", { exact: false })).toBeVisible();
+  await page.getByRole("button", { name: "Import reviewed loading" }).click();
+  await expect(
+    page.getByText("Loading imported.", { exact: false }),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "Faculty loads", exact: true }).click();
+  const row = page.getByRole("row").filter({ hasText: "Example Teacher" });
+  await expect(
+    row.getByRole("cell", { name: "9.10 / 18", exact: true }),
+  ).toBeVisible();
+  await expect(row.getByRole("cell", { name: "1", exact: true })).toBeVisible();
+  await page.getByRole("link", { name: "Loading & scheduling" }).click();
+  await page.getByRole("button", { name: /BCA111 · B181/ }).click();
+  await expect(
+    page.getByRole("heading", { name: "Lab B181.1", exact: true }),
+  ).toBeVisible();
+  await page.reload();
+  await page.getByRole("button", { name: /BCA111 · B181/ }).click();
+  await expect(
+    page.getByRole("heading", { name: "Lab B181.1", exact: true }),
+  ).toBeVisible();
+});

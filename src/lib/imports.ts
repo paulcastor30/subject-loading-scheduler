@@ -55,7 +55,10 @@ export function previewImport(
         existing.id === parsed.data.id ||
         ("code" in parsed.data &&
           String(existing.code).toLowerCase() ===
-            String(parsed.data.code).toLowerCase()) ||
+            String(parsed.data.code).toLowerCase() &&
+          (entity !== "subjects" ||
+            existing.curriculumId ===
+              (parsed.data as { curriculumId?: string }).curriculumId)) ||
         JSON.stringify({ ...existing, id: "" }) ===
           JSON.stringify({ ...parsed.data, id: "" }),
     );

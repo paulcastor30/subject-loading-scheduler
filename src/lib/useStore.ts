@@ -61,6 +61,12 @@ export function useStore() {
             ids = new Set(offerings.map((o) => o.id));
           return JSON.stringify({
             offerings,
+            teachingGroups: d.teachingGroups.filter((g) =>
+              ids.has(g.offeringId),
+            ),
+            loadActivities: d.loadActivities.filter(
+              (a) => a.semesterId === term.id,
+            ),
             assignments: d.assignments.filter((a) => ids.has(a.offeringId)),
             meetings: d.meetings.filter((m) => ids.has(m.offeringId)),
           });

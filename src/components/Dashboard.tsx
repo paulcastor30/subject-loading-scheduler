@@ -1,19 +1,26 @@
-import { useMemo } from "react";
+import { SemesterSetup } from "./SemesterSetup";
+import type { Commit } from "../lib/useStore";
+import { offeringComplete, teachingLoad } from "../lib/loading";
+import { useMemo, useState } from "react";
 import { offeringName, type Data } from "../lib/model";
-import { utilization, validate, workload } from "../lib/engine";
+import { utilization, validate } from "../lib/engine";
 import { Badge, Empty, Panel } from "./UI";
 export function Dashboard({
   data,
   term,
   navigate,
+  commit,
+  onTerm,
 }: {
   data: Data;
   term: string;
+  commit: Commit;
+  onTerm: (id: string) => void;
   navigate: (page: string, mode?: string) => void;
 }) {
-  const offerings = data.offerings.filter((o) => o.semesterId === term),
-    ids = new Set(offerings.map((o) => o.id));
-  const assigned = data.assignments.filter((a) => ids.has(a.offeringId));
+  const [showSetup, setShowSetup] = useState(false);
+  const offerings = data.offerings.filter((o) => o.semesterId === term);
+  const assigned = offerings.filter((o) => offeringComplete(data, o.id));
   const issues = useMemo(() => validate(data, term), [data, term]);
   const stats = useMemo(
     () =>
@@ -23,12 +30,10 @@ export function Dashboard({
     [data, term],
   );
   const totalLoad = data.faculty.reduce(
-    (s, f) => s + workload(data, f.id, term),
+    (s, f) => s + teachingLoad(data, f.id, term),
     0,
   );
-  const unassigned = offerings.filter(
-    (o) => !assigned.some((a) => a.offeringId === o.id),
-  );
+  const unassigned = offerings.filter((o) => !offeringComplete(data, o.id));
   return (
     <>
       <div className="welcome">
@@ -53,6 +58,94 @@ export function Dashboard({
           or add the BSCA prospectus sample under Data management & backups.
           This workspace starts empty.
         </div>
+      )}
+      <div className="next-steps no-print">
+        <div>
+          <h2>Get the semester ready</h2>
+          <p className="note">
+            Work through the next unfinished task, or bring in your previous
+            loading.
+          </p>
+        </div>
+        <div className="actions wrap">
+          <button onClick={() => setShowSetup(!showSetup)}>
+            Start a semester / draft
+          </button>
+          <button
+            className="primary"
+            onClick={() => navigate("settings", "import")}
+          >
+            Import previous loading
+          </button>
+        </div>
+        <div className="checklist-grid">
+          {[
+            {
+              label: "1 · Academic term",
+              done: !!term,
+              page: "dashboard",
+              mode: "",
+            },
+            {
+              label: "2 · Faculty roster",
+              done: data.faculty.some((f) => f.active),
+              page: "settings",
+              mode: "faculty",
+            },
+            {
+              label: "3 · Rooms & capacity",
+              done: data.rooms.some((r) => r.active),
+              page: "settings",
+              mode: "rooms",
+            },
+            {
+              label: "4 · Subjects and blocks",
+              done: data.subjects.length > 0 && data.sections.length > 0,
+              page: "settings",
+              mode: data.subjects.length ? "sections" : "subjects",
+            },
+            {
+              label: "5 · Offered classes",
+              done: offerings.length > 0,
+              page: "scheduling",
+              mode: "new",
+            },
+            {
+              label: "6 · Assign and schedule",
+              done:
+                offerings.length > 0 &&
+                !issues.some((i) =>
+                  ["contact-hours", "unassigned"].includes(i.code),
+                ),
+              page: "scheduling",
+              mode: "issues",
+            },
+          ].map((step) => (
+            <button
+              key={step.label}
+              className={step.done ? "step-done" : ""}
+              onClick={() =>
+                step.label.startsWith("1")
+                  ? setShowSetup(true)
+                  : navigate(step.page, step.mode)
+              }
+            >
+              <span>{step.done ? "✓" : "○"}</span>
+              {step.label}
+              <small>{step.done ? "Ready" : "Continue →"}</small>
+            </button>
+          ))}
+        </div>
+      </div>
+      {(showSetup || !data.semesters.length) && (
+        <SemesterSetup
+          data={data}
+          commit={commit}
+          onDone={(id) => {
+            setShowSetup(false);
+            onTerm(id);
+          }}
+        />
       )}
       <div className="stats-grid">
         {[

@@ -1,3 +1,13 @@
+import {
+  groupCredits,
+  groupLabel,
+  loadRows,
+  meetingAssignment,
+  offeringComplete,
+  otherLoad,
+  preparations,
+  teachingLoad,
+} from "./loading";
 import { days, offeringName, rowName, type Data } from "./model";
 import { utilization, validate, workload } from "./engine";
 export const reportTypes = [
@@ -10,6 +20,7 @@ export const reportTypes = [
   "Room Utilization Summary",
   "Unassigned Subject Report",
   "Scheduling Conflict Report",
+  "OVCAA Form 3 Loading Summary",
 ] as const;
 export type ReportType = (typeof reportTypes)[number];
 export function buildReport(
@@ -28,12 +39,59 @@ export function buildReport(
   const ids = new Set(offerings.map((o) => o.id));
   const assignments = data.assignments.filter((a) => ids.has(a.offeringId));
   const facultyName = (offeringId: string) =>
-    rowName(
-      data,
-      "faculty",
-      data.assignments.find((a) => a.offeringId === offeringId)?.facultyId ??
-        "",
-    );
+    [
+      ...new Set(
+        data.assignments
+          .filter((a) => a.offeringId === offeringId)
+          .map((a) => rowName(data, "faculty", a.facultyId)),
+      ),
+    ].join("; ") || "Unassigned";
+  if (type === "OVCAA Form 3 Loading Summary")
+    return {
+      headers: [
+        "Faculty",
+        "Rank",
+        "Course / section / duty",
+        "Group / category",
+        "Schedule",
+        "Day",
+        "Room",
+        "Academic / other credit",
+        "Students",
+        "Credit source",
+      ],
+      rows: data.faculty
+        .filter((f) => !resource || f.id === resource)
+        .flatMap((f) => {
+          const details = loadRows(data, term, f.id, program).map((row) => [
+            f.name,
+            f.rank ?? "",
+            ...row,
+          ]);
+          const teaching =
+              details.reduce(
+                (sum, row) => sum + (typeof row[7] === "number" ? row[7] : 0),
+                0,
+              ) - otherLoad(data, f.id, term),
+            other = otherLoad(data, f.id, term),
+            total = teaching + other;
+          return [
+            ...details,
+            [
+              f.name,
+              f.rank ?? "",
+              "TOTAL FACULTY LOAD",
+              "",
+              "",
+              "",
+              "",
+              Number(total.toFixed(2)),
+              "",
+              `Teaching ${teaching.toFixed(2)}; other ${other.toFixed(2)}; preparations ${preparations(data, f.id, term)}; limit ${f.maxLoad}; over ${Math.max(0, total - f.maxLoad).toFixed(2)}; under ${Math.max(0, f.maxLoad - total).toFixed(2)}`,
+            ],
+          ];
+        }),
+    };
   if (type === "Departmental Faculty Loading Summary")
     return {
       headers: [
@@ -42,8 +100,13 @@ export function buildReport(
         "Course units",
         "Planned contact hours",
         "Scheduled hours",
-        "Credited load",
+        "Teaching load",
         "Load limit",
+        "Other duties",
+        "Total load",
+        "Preparations",
+        "Over limit",
+        "Under limit",
       ],
       rows: data.faculty
         .filter(
@@ -51,15 +114,28 @@ export function buildReport(
         )
         .map((f) => {
           const own = assignments.filter((a) => a.facultyId === f.id),
-            subjects = own.map((a) =>
-              data.subjects.find(
-                (s) =>
-                  s.id ===
-                  data.offerings.find((o) => o.id === a.offeringId)?.subjectId,
-              )!,
+            offers = [...new Set(own.map((a) => a.offeringId))].map((id) =>
+              offerings.find((o) => o.id === id)!,
             );
+          const hours = own.reduce((sum, a) => {
+            const group = data.teachingGroups.find((g) => g.id === a.groupId);
+            const subject = data.subjects.find(
+              (s) =>
+                s.id ===
+                offerings.find((o) => o.id === a.offeringId)?.subjectId,
+            );
+            return (
+              sum +
+              (group?.contactHours ??
+                (subject ? subject.lectureHours + subject.labHours : 0))
+            );
+          }, 0);
           const scheduled = data.meetings
-            .filter((m) => own.some((a) => a.offeringId === m.offeringId))
+            .filter(
+              (m) =>
+                ids.has(m.offeringId) &&
+                meetingAssignment(data, m)?.facultyId === f.id,
+            )
             .reduce(
               (sum, m) =>
                 sum +
@@ -70,21 +146,45 @@ export function buildReport(
                   60,
               0,
             );
-          const rule = data.workloadRules[0];
+          const teaching = program
+            ? own.reduce((sum, a) => {
+                const group = data.teachingGroups.find(
+                    (g) => g.id === a.groupId,
+                  ),
+                  s = data.subjects.find(
+                    (s) =>
+                      s.id ===
+                      offerings.find((o) => o.id === a.offeringId)?.subjectId,
+                  )!;
+                return (
+                  sum +
+                  (group
+                    ? groupCredits(data, group)
+                    : s.lectureHours * data.workloadRules[0].lectureFactor +
+                      s.labHours * data.workloadRules[0].labFactor)
+                );
+              }, 0)
+            : teachingLoad(data, f.id, term);
+          const other = otherLoad(data, f.id, term),
+            total = teaching + other;
           return [
             f.name,
-            own.length,
-            subjects.reduce((s, v) => s + v.courseUnits, 0),
-            subjects.reduce((s, v) => s + v.lectureHours + v.labHours, 0),
-            Number(scheduled.toFixed(2)),
-            subjects.reduce(
-              (s, v) =>
-                s +
-                v.lectureHours * rule.lectureFactor +
-                v.labHours * rule.labFactor,
+            offers.length,
+            offers.reduce(
+              (sum, o) =>
+                sum +
+                data.subjects.find((s) => s.id === o.subjectId)!.courseUnits,
               0,
             ),
+            hours,
+            Number(scheduled.toFixed(2)),
+            Number(teaching.toFixed(2)),
             f.maxLoad,
+            other,
+            Number(total.toFixed(2)),
+            preparations(data, f.id, term),
+            Number(Math.max(0, total - f.maxLoad).toFixed(2)),
+            Number(Math.max(0, f.maxLoad - total).toFixed(2)),
           ];
         }),
     };
@@ -144,10 +244,7 @@ export function buildReport(
             ids.has(m.offeringId) &&
             (!resource ||
               (type === "Faculty Weekly Schedule"
-                ? assignments.some(
-                    (a) =>
-                      a.offeringId === m.offeringId && a.facultyId === resource,
-                  )
+                ? meetingAssignment(data, m)?.facultyId === resource
                 : type === "Student Section Weekly Schedule"
                   ? offerings.some(
                       (o) => o.id === m.offeringId && o.sectionId === resource,
@@ -160,14 +257,14 @@ export function buildReport(
           m.start,
           m.end,
           offeringName(data, m.offeringId),
-          m.component,
-          facultyName(m.offeringId),
+          `${m.component} · ${groupLabel(data, m.groupId)}`,
+          rowName(data, "faculty", meetingAssignment(data, m)?.facultyId ?? ""),
           rowName(data, "rooms", m.roomId),
         ]),
     };
   const filtered = offerings.filter((o) =>
     type === "Unassigned Subject Report"
-      ? !assignments.some((a) => a.offeringId === o.id)
+      ? !offeringComplete(data, o.id)
       : type === "Individual Faculty Teaching Load" && resource
         ? assignments.some(
             (a) => a.offeringId === o.id && a.facultyId === resource,
@@ -175,6 +272,20 @@ export function buildReport(
         : true,
   );
   const rule = data.workloadRules[0];
+  if (type === "Individual Faculty Teaching Load" && resource)
+    return {
+      headers: [
+        "Course / section / duty",
+        "Group / category",
+        "Schedule",
+        "Day",
+        "Room",
+        "Credit",
+        "Students",
+        "Credit source",
+      ],
+      rows: loadRows(data, term, resource, program),
+    };
   return {
     headers: [
       "Subject",
@@ -197,9 +308,17 @@ export function buildReport(
         s.courseUnits,
         s.lectureHours,
         s.labHours,
-        assignments.some((a) => a.offeringId === o.id)
-          ? s.lectureHours * rule.lectureFactor + s.labHours * rule.labFactor
-          : 0,
+        data.teachingGroups.some((g) => g.offeringId === o.id)
+          ? data.teachingGroups
+              .filter(
+                (g) =>
+                  g.offeringId === o.id &&
+                  assignments.some((a) => a.groupId === g.id),
+              )
+              .reduce((sum, g) => sum + groupCredits(data, g), 0)
+          : assignments.some((a) => a.offeringId === o.id)
+            ? s.lectureHours * rule.lectureFactor + s.labHours * rule.labFactor
+            : 0,
         data.meetings
           .filter((m) => m.offeringId === o.id)
           .map(

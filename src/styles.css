@@ -1360,3 +1360,224 @@ td .meter {
   position: sticky;
   top: 0;
 }
+.next-steps {
+  background: #fff;
+  border: 1px solid #dce5dd;
+  border-radius: 9px;
+  padding: 20px;
+  margin-bottom: 22px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: start;
+  justify-content: space-between;
+}
+.next-steps h2 {
+  font-size: 15px;
+}
+.checklist-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+.checklist-grid button {
+  text-align: left;
+  font-size: 12px;
+  white-space: normal;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.checklist-grid small {
+  display: block;
+  margin-left: auto;
+  color: #607365;
+  font-size: 10px;
+}
+.checklist-grid .step-done {
+  background: #f0f7ed;
+  color: #35643a;
+}
+.setup-groups {
+  display: block;
+  margin: 0 0 17px;
+  width: 100%;
+  background: #eaf3ec;
+  text-align: left;
+  white-space: normal;
+}
+.group-card {
+  border: 1px solid #d2e0d4;
+  border-radius: 8px;
+  padding: 18px;
+  margin-bottom: 17px;
+  background: #fbfdf9;
+}
+.group-heading {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.group-card .form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 14px 0;
+}
+.group-card summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: #365f42;
+  padding: 7px 0;
+}
+.group-card .actions {
+  margin-top: 13px;
+}
+.group-meetings {
+  border-top: 1px solid #d6e2d5;
+  margin-top: 18px;
+  padding-top: 17px;
+}
+.load-preview {
+  font-size: 11px;
+  padding: 10px;
+  background: #edf4e9;
+  border-radius: 6px;
+  margin-top: 12px;
+}
+.day-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px 0;
+}
+.filter-disclosure {
+  min-width: 180px;
+  flex: 3;
+}
+.filter-disclosure summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 9px 0;
+  color: #3e664a;
+}
+.filter-disclosure > .toolbar {
+  margin-top: 12px;
+}
+.import-step {
+  border-top: 1px solid #e0e8df;
+  padding: 19px 0;
+}
+.import-step h3 {
+  font-size: 15px;
+  margin-bottom: 10px;
+}
+.source-review {
+  max-height: 460px;
+}
+.source-review th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.source-review td {
+  font-size: 11px;
+}
+.source-review input:not([type="checkbox"]) {
+  min-width: 90px;
+}
+.source-review input[type="number"] {
+  width: 90px;
+}
+.source-review input[type="text"] {
+  width: 150px;
+}
+.import-step + .check {
+  margin: 15px 0;
+}
+@media (max-width: 760px) {
+  .checklist-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .checklist-grid button {
+    flex-wrap: wrap;
+  }
+  .group-card .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .group-card {
+    padding: 13px;
+  }
+  .group-card .actions button {
+    white-space: normal;
+  }
+  .filter-disclosure {
+    min-width: 100%;
+  }
+}
+.faculty-report-block {
+  margin-bottom: 24px;
+  border: 1px solid #dce5dd;
+  border-radius: 7px;
+  overflow: hidden;
+}
+.faculty-report-block h3 {
+  padding: 14px 16px;
+  background: #edf4e9;
+}
+.faculty-report-block h3 small {
+  font-weight: 400;
+}
+.faculty-report-block table {
+  background: #fff;
+}
+.load-total {
+  font-weight: 700;
+  background: #f1f6ee;
+}
+.form3-report {
+  overflow: auto;
+}
+.group-card .alert {
+  margin-top: 10px;
+}
+@media print {
+  .faculty-report-block {
+    break-inside: auto;
+    border: 0;
+    border-radius: 0;
+  }
+  .faculty-report-block h3 {
+    break-after: avoid;
+    font-size: 12px;
+    padding: 10px 0;
+  }
+  .form3-report {
+    overflow: visible;
+  }
+  .faculty-report-block table {
+    font-size: 8px;
+  }
+  .form3-report .note {
+    font-size: 8px;
+  }
+  .next-steps {
+    display: none;
+  }
+}
+.group-fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.group-fieldset:disabled {
+  opacity: 0.65;
+}
+@media (min-width: 1101px) {
+  .scheduling-split {
+    grid-template-columns: minmax(250px, 0.7fr) minmax(0, 1.4fr);
+  }
+}

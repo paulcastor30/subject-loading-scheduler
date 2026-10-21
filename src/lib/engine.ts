@@ -1,3 +1,4 @@
+import { meetingAssignment, teachingLoad, otherLoad } from "./loading";
 import { days, offeringName, type Data, type Row } from "./model";
 export const minutes = (time: string) => {
   const [h, m] = time.split(":").map(Number);
@@ -17,21 +18,13 @@ export type Issue = {
   meetingId?: string;
 };
 export function workload(data: Data, facultyId: string, semesterId: string) {
-  const rule = data.workloadRules[0];
-  return data.assignments
-    .filter((a) => a.facultyId === facultyId)
-    .reduce((sum, a) => {
-      const o = data.offerings.find(
-        (o) => o.id === a.offeringId && o.semesterId === semesterId,
-      );
-      const s = data.subjects.find((s) => s.id === o?.subjectId);
-      return (
-        sum +
-        (s
-          ? s.lectureHours * rule.lectureFactor + s.labHours * rule.labFactor
-          : 0)
-      );
-    }, 0);
+  return (
+    Math.round(
+      (teachingLoad(data, facultyId, semesterId) +
+        otherLoad(data, facultyId, semesterId)) *
+        10000,
+    ) / 10000
+  );
 }
 function covered(
   start: string,
@@ -85,7 +78,9 @@ export function validate(data: Data, semesterId?: string): Issue[] {
     (o) => !semesterId || o.semesterId === semesterId,
   );
   const offeringMap = new Map(data.offerings.map((o) => [o.id, o]));
-  const assignmentMap = new Map(data.assignments.map((a) => [a.offeringId, a]));
+  const assignmentMap = new Map(
+    data.assignments.map((a) => [`${a.offeringId}|${a.groupId ?? ""}`, a]),
+  );
   const meetings = data.meetings.filter((m) =>
     offerings.some((o) => o.id === m.offeringId),
   );
@@ -105,7 +100,9 @@ export function validate(data: Data, semesterId?: string): Issue[] {
     });
   for (const o of offerings) {
     const subject = data.subjects.find((s) => s.id === o.subjectId);
-    const assignment = assignmentMap.get(o.id);
+    const groups = data.teachingGroups.filter((g) => g.offeringId === o.id);
+    const assignments = data.assignments.filter((a) => a.offeringId === o.id);
+    const assignment = assignments[0];
     if (!assignment)
       add(
         "warning",
@@ -114,13 +111,29 @@ export function validate(data: Data, semesterId?: string): Issue[] {
         undefined,
         o.id,
       );
-    else {
+    for (const assignment of assignments) {
       const faculty = data.faculty.find((f) => f.id === assignment.facultyId);
       if (!faculty?.active)
         add(
           "error",
           "inactive-faculty",
           `${offeringName(data, o.id)} requires an active faculty member.`,
+          undefined,
+          o.id,
+        );
+      if (
+        faculty &&
+        data.loadActivities.some(
+          (a) =>
+            a.semesterId === o.semesterId &&
+            a.facultyId === faculty.id &&
+            a.kind === "leave",
+        )
+      )
+        add(
+          "error",
+          "faculty-leave",
+          `${faculty.name} is on leave in this semester. Reassign the class or review the leave record.`,
           undefined,
           o.id,
         );
@@ -145,18 +158,76 @@ export function validate(data: Data, semesterId?: string): Issue[] {
           o.id,
         );
     }
-    for (const component of ["lecture", "lab"] as const) {
+    const targets = groups.length
+      ? groups.map((g) => ({
+          component: g.component,
+          expected: g.contactHours,
+          groupId: g.id,
+          name: g.name,
+        }))
+      : (["lecture", "lab"] as const).map((component) => ({
+          component,
+          expected:
+            subject?.[component === "lecture" ? "lectureHours" : "labHours"] ??
+            0,
+          groupId: undefined,
+          name: component,
+        }));
+    for (const target of targets) {
+      if (
+        groups.length &&
+        !data.assignments.some((a) => a.groupId === target.groupId)
+      )
+        add(
+          "warning",
+          "unassigned",
+          `${offeringName(data, o.id)} · ${target.name} needs a faculty assignment.`,
+          undefined,
+          o.id,
+        );
       const scheduled =
         data.meetings
-          .filter((m) => m.offeringId === o.id && m.component === component)
-          .reduce((s, m) => s + minutes(m.end) - minutes(m.start), 0) / 60;
-      const expected =
-        subject?.[component === "lecture" ? "lectureHours" : "labHours"] ?? 0;
-      if (Math.abs(scheduled - expected) > 0.001)
+          .filter(
+            (m) =>
+              m.offeringId === o.id &&
+              m.component === target.component &&
+              m.groupId === target.groupId,
+          )
+          .reduce((sum, m) => sum + minutes(m.end) - minutes(m.start), 0) / 60;
+      if (Math.abs(scheduled - target.expected) > 0.001)
         add(
           "warning",
           "contact-hours",
-          `${offeringName(data, o.id)}: ${scheduled} of ${expected} weekly ${component} contact hours scheduled.`,
+          `${offeringName(data, o.id)} · ${target.name}: ${scheduled} of ${target.expected} weekly contact hours scheduled.`,
+          undefined,
+          o.id,
+        );
+    }
+    for (const component of ["lecture", "lab"] as const) {
+      if (
+        groups.length &&
+        subject &&
+        subject[component === "lecture" ? "lectureHours" : "labHours"] > 0 &&
+        !groups.some((g) => g.component === component)
+      )
+        add(
+          "warning",
+          "missing-component",
+          `${offeringName(data, o.id)} has no ${component} group. Review its component requirements.`,
+          undefined,
+          o.id,
+        );
+      const componentGroups = groups.filter((g) => g.component === component);
+      const section = data.sections.find((s) => s.id === o.sectionId);
+      if (
+        componentGroups.length &&
+        componentGroups.reduce((sum, g) => sum + g.students, 0) !==
+          section?.size
+      )
+        add(
+          "warning",
+          "group-enrollment",
+          `${offeringName(data, o.id)}: ${component} group enrollments do not total the section size. Review group membership.`,
           undefined,
           o.id,
         );
@@ -168,7 +239,8 @@ export function validate(data: Data, semesterId?: string): Issue[] {
       room = data.rooms.find((r) => r.id === m.roomId);
     const section = data.sections.find((s) => s.id === o?.sectionId),
       subject = data.subjects.find((s) => s.id === o?.subjectId);
-    const assignment = assignmentMap.get(m.offeringId);
+    const assignment = meetingAssignment(data, m);
+    const group = data.teachingGroups.find((g) => g.id === m.groupId);
     const faculty = data.faculty.find((f) => f.id === assignment?.facultyId);
     const context = `${offeringName(data, m.offeringId)} · ${days[m.day]} ${m.start}–${m.end}`;
     if (
@@ -185,11 +257,11 @@ export function validate(data: Data, semesterId?: string): Issue[] {
       );
     if (!room?.active)
       add("error", "inactive-room", `${context}: choose an active room.`, m);
-    if (room && section && room.capacity < section.size)
+    if (room && section && room.capacity < (group?.students ?? section.size))
       add(
         "error",
         "capacity",
-        `${room.code} seats ${room.capacity}; ${section.name} needs ${section.size} seats. Choose a larger room.`,
+        `${room.code} seats ${room.capacity}; ${section.name} needs ${group?.students ?? section.size} seats. Choose a larger room.`,
         m,
       );
     if (m.component === "lab" && room?.type !== "laboratory")
@@ -200,6 +272,7 @@ export function validate(data: Data, semesterId?: string): Issue[] {
         m,
       );
     if (
+      !group &&
       subject?.[m.component === "lecture" ? "lectureHours" : "labHours"] === 0
     )
       add(
@@ -267,7 +340,9 @@ export function validate(data: Data, semesterId?: string): Issue[] {
         !overlaps(m, n)
       )
         continue;
-      const otherAssignment = assignmentMap.get(n.offeringId);
+      const otherAssignment = assignmentMap.get(
+        `${n.offeringId}|${n.groupId ?? ""}`,
+      );
       const pair = `${context} overlaps ${offeringName(data, n.offeringId)} (${n.start}–${n.end}).`;
       if (m.roomId === n.roomId)
         add(
@@ -276,7 +351,18 @@ export function validate(data: Data, semesterId?: string): Issue[] {
           `${room?.code} is already occupied. ${pair} Choose another room or time.`,
           m,
         );
-      if (o.sectionId === other.sectionId)
+      if (
+        o.sectionId === other.sectionId &&
+        !(
+          o.id === other.id &&
+          m.groupId &&
+          n.groupId &&
+          m.groupId !== n.groupId &&
+          group?.component === "lab" &&
+          data.teachingGroups.find((g) => g.id === n.groupId)?.component ===
+            "lab"
+        )
+      )
         add(
           "error",
           "section-overlap",
@@ -302,7 +388,8 @@ export function validate(data: Data, semesterId?: string): Issue[] {
       const load = workload(data, f.id, term);
       if (load > f.maxLoad)
         add(
-          rule.overload,
+          data.semesters.find((s) => s.id === term)?.overloadPolicy ??
+            rule.overload,
           "load-limit",
           `${f.name}: ${load.toFixed(2)} credited units exceeds the ${f.maxLoad} unit limit (${data.semesters.find((s) => s.id === term)?.name}).`,
         );
@@ -397,6 +484,7 @@ export function suggestions(
   offeringId: string,
   component: "lecture" | "lab",
   duration = 60,
+  groupId?: string,
 ) {
   const o = data.offerings.find((o) => o.id === offeringId),
     s = data.subjects.find((s) => s.id === o?.subjectId),
@@ -404,6 +492,17 @@ export function suggestions(
   if (!o || !s || !section) return [];
   const result: Omit<Row<"meetings">, "id">[] = [];
   const rule = data.schedulingRules[0];
+  const faculty = data.assignments.find(
+    (a) => a.offeringId === offeringId && a.groupId === groupId,
+  )?.facultyId;
+  const relevant = data.meetings.filter(
+    (m) =>
+      data.offerings.find((o) => o.id === m.offeringId)?.semesterId ===
+        o.semesterId &&
+      (data.offerings.find((o) => o.id === m.offeringId)?.sectionId ===
+        o.sectionId ||
+        (faculty && meetingAssignment(data, m)?.facultyId === faculty)),
+  );
   for (const day of rule.days)
     for (
       let t = minutes(rule.start);
@@ -412,12 +511,16 @@ export function suggestions(
     ) {
       const start = clockTime(t),
         end = clockTime(t + duration);
+      if (relevant.some((m) => m.day === day && overlaps(m, { start, end })))
+        continue;
       const rooms = availableRooms(data, {
         semesterId: o.semesterId,
         day,
         start,
         end,
-        size: section.size,
+        size:
+          data.teachingGroups.find((g) => g.id === groupId)?.students ??
+          section.size,
         type: component === "lab" ? "laboratory" : "",
         equipment: s.equipment,
       });
@@ -430,6 +533,7 @@ export function suggestions(
           start,
           end,
           roomId: room.id,
+          ...(groupId ? { groupId } : {}),
         };
         const candidate = { ...data, meetings: [...data.meetings, meeting] };
         if (

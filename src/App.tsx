@@ -1,3 +1,4 @@
+import { FacultyLoads } from "./components/FacultyLoads";
 import { readPreference, writePreference } from "./lib/preferences";
 import { Component, useEffect, useState, type ReactNode } from "react";
 import { useStore } from "./lib/useStore";
@@ -7,10 +8,12 @@ import { Rooms } from "./components/Rooms";
 import { Reports } from "./components/Reports";
 import { Records } from "./components/Records";
 import { DataManagement } from "./components/DataManagement";
+import { entities, type Entity } from "./lib/model";
 import { ErrorMessage } from "./components/UI";
 const pages = [
   ["dashboard", "Overview", "◫"],
   ["scheduling", "Loading & scheduling", "▤"],
+  ["loads", "Faculty loads", "▧"],
   ["rooms", "Rooms", "▦"],
   ["reports", "Reports", "▥"],
   ["settings", "Settings & data", "⚙"],
@@ -18,6 +21,7 @@ const pages = [
 const descriptions: Record<string, string> = {
   dashboard: "A practical overview of your academic semester.",
   scheduling: "Assign faculty and build a conflict-free weekly schedule.",
+  loads: "Review teaching credits, other duties and preparations in one place.",
   rooms: "Find the right space and make the most of every room.",
   reports: "Clear, consistent records for your department.",
   settings: "Maintain academic records and keep your data protected.",
@@ -34,7 +38,9 @@ export default function App() {
     { data, ready, error, setError, status, commit } = store;
   const [route, setRoute] = useState(readRoute),
     [chosenTerm, setChosenTerm] = useState(() => readPreference("slss-term")),
-    [settingsTab, setSettingsTab] = useState("records");
+    [settingsTab, setSettingsTab] = useState(() =>
+      readRoute().mode === "import" ? "data" : "records",
+    );
   const term = data.semesters.some((s) => s.id === chosenTerm)
     ? chosenTerm
     : (data.semesters[0]?.id ?? "");
@@ -44,6 +50,8 @@ export default function App() {
     return () => removeEventListener("hashchange", listener);
   }, []);
   const navigate = (page: string, mode = "") => {
+    if (page === "settings")
+      setSettingsTab(mode === "import" ? "data" : "records");
     location.hash = `${page}${mode ? `/${mode}` : ""}`;
     setRoute({ page, mode });
   };
@@ -208,7 +216,16 @@ export default function App() {
           {ready ? (
             <>
               {route.page === "dashboard" && (
-                <Dashboard data={data} term={term} navigate={navigate} />
+                <Dashboard
+                  data={data}
+                  term={term}
+                  navigate={navigate}
+                  commit={commit}
+                  onTerm={(id) => {
+                    setChosenTerm(id);
+                    writePreference("slss-term", id);
+                  }}
+                />
               )}{" "}
               {route.page === "scheduling" && (
                 <Scheduling
@@ -219,6 +236,14 @@ export default function App() {
                   initialMode={route.mode || "guided"}
                 />
               )}{" "}
+              {route.page === "loads" && (
+                <FacultyLoads
+                  key={term}
+                  data={data}
+                  term={term}
+                  commit={commit}
+                />
+              )}
               {route.page === "rooms" && <Rooms data={data} term={term} />}{" "}
               {route.page === "reports" && (
                 <Reports data={data} term={term} onError={setError} />
@@ -246,11 +271,21 @@ export default function App() {
                     </button>
                   </div>
                   {settingsTab === "records" && (
-                    <Records data={data} commit={commit} />
+                    <Records
+                      key={route.mode}
+                      data={data}
+                      commit={commit}
+                      initialEntity={
+                        entities.includes(route.mode as Entity)
+                          ? (route.mode as Entity)
+                          : "faculty"
+                      }
+                    />
                   )}{" "}
                   {settingsTab === "data" && (
                     <DataManagement
                       data={data}
+                      term={term}
                       commit={commit}
                       replace={store.replace}
                       onError={setError}
@@ -319,12 +354,14 @@ export default function App() {
                       </p>
                       <h3>Calculation assumptions</h3>
                       <p>
-                        Credited load is based on planned weekly subject contact
-                        hours, once per assigned offering. It is independent of
-                        course units and actual scheduled hours. Edit workload
-                        factors to reflect your department’s rules. Availability
-                        and class meetings describe a typical recurring week,
-                        without date-specific holidays or exam exceptions.
+                        Credited load is counted once per teaching group, using
+                        its contact hours and category factor or a sourced
+                        override. Other duties are added separately. Older
+                        whole-offering assignments retain their original
+                        department-factor calculation. Course units remain
+                        independent. Availability and class meetings describe a
+                        typical recurring week, without date-specific holidays
+                        or exam exceptions.
                       </p>
                     </section>
                   )}
