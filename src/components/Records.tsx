@@ -1,3 +1,4 @@
+import { useDraft } from "../lib/drafts";
 import { useRef, useState, type FormEvent } from "react";
 import {
   days,
@@ -91,16 +92,22 @@ export function RecordForm({
   initial,
   onSave,
   onCancel,
+  draftKey,
+  draftHref,
 }: {
   data: Data;
   entity: Entity;
   initial?: Record<string, unknown>;
   onSave: (row: Record<string, unknown>) => Promise<boolean>;
   onCancel: () => void;
+  draftKey?: string;
+  draftHref?: string;
 }) {
   const fields = Object.keys(schemas[entity].shape).filter((f) => f !== "id");
-  const [value, setValue] = useState<Record<string, unknown>>(
-      () =>
+  const draft = useDraft<Record<string, unknown>>(
+    draftKey ?? `record:${entity}:${initial?.id ?? "new"}`,
+    () => {
+      const row =
         initial ??
         Object.fromEntries(
           ["id", ...fields].map((f) => [
@@ -113,9 +120,27 @@ export function RecordForm({
                   ? "blocked"
                   : (defaults[f] ?? ""),
           ]),
-        ),
-    ),
-    [error, setError] = useState(""),
+        );
+      return Object.fromEntries(
+        Object.entries(row).map(([field, value]) => {
+          const target = refs[entity]?.[field];
+          return [
+            field,
+            target &&
+            !["groupId", "loadCategoryId"].includes(field) &&
+            (value === "" || value === undefined) &&
+            data[target].length === 1
+              ? data[target][0].id
+              : value,
+          ];
+        }),
+      );
+    },
+    `${initial ? "Edit" : "Add"} ${labels[entity].toLowerCase()}`,
+    draftHref ?? `#settings/${entity}?record=${initial?.id ?? "new"}`,
+  );
+  const { value, setValue } = draft;
+  const [error, setError] = useState(""),
     [saving, setSaving] = useState(false);
   const set = (key: string, v: unknown) =>
     setValue((prev) => ({ ...prev, [key]: v }));
@@ -154,7 +179,7 @@ export function RecordForm({
         )
       )
         return;
-      await onSave(result.data);
+      if (await onSave(result.data)) draft.clear();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to save.");
     } finally {
@@ -167,6 +192,28 @@ export function RecordForm({
         {initial ? "Edit" : "Add"} {labels[entity].toLowerCase()}
       </h3>
       <ErrorMessage message={error} />
+      {draft.dirty && (
+        <p className="draft-note">
+          Unfinished edits kept in this tab. Save this form to update academic
+          records.
+        </p>
+      )}
+      {draft.storageError && (
+        <ErrorMessage message="This draft could not be kept in browser storage. Save before leaving the page." />
+      )}
+      {Object.entries(refs[entity] ?? {})
+        .filter(
+          ([field, target]) =>
+            !["groupId", "loadCategoryId"].includes(field) &&
+            !data[target].length,
+        )
+        .map(([, target]) => (
+          <p key={target} className="alert warning">
+            Add {labels[target].toLowerCase()} first.{" "}
+            <a href={`#settings/${target}?record=new`}>Add now →</a> Your
+            unfinished form will be kept in this tab.
+          </p>
+        ))}
       <div className="form-grid">
         {fields.map((field) => {
           const target = refs[entity]?.[field];
@@ -326,7 +373,13 @@ export function RecordForm({
         <button className="primary" disabled={saving}>
           {saving ? "Saving…" : "Save record"}
         </button>
-        <button type="button" onClick={onCancel}>
+        <button
+          type="button"
+          onClick={() => {
+            draft.clear();
+            onCancel();
+          }}
+        >
           Cancel
         </button>
       </div>
@@ -337,15 +390,27 @@ export function Records({
   data,
   commit,
   initialEntity = "faculty",
+  initialRecordId = "",
+  onEntityChange,
 }: {
   data: Data;
   commit: Commit;
   initialEntity?: Entity;
+  initialRecordId?: string;
+  onEntityChange?: (entity: Entity) => void;
 }) {
   const [entity, setEntity] = useState<Entity>(initialEntity),
     [editing, setEditing] = useState<
       Record<string, unknown> | null | undefined
-    >(),
+    >(() =>
+      initialRecordId === "new"
+        ? null
+        : initialRecordId
+          ? (data[initialEntity].find(
+              (r) => r.id === initialRecordId,
+            ) as unknown as Record<string, unknown> | undefined)
+          : undefined,
+    ),
     [search, setSearch] = useState(""),
     [selected, setSelected] = useState<string[]>([]),
     [plan, setPlan] = useState<ChangePlan | null>(null),
@@ -361,6 +426,29 @@ export function Records({
         String(v).toLowerCase().includes(search.toLowerCase()),
       ),
   );
+  function chooseEntity(next: Entity) {
+    setEntity(next);
+    setEditing(undefined);
+    setSearch("");
+    setSelected([]);
+    setPlan(null);
+    setMessage("");
+    setError("");
+    onEntityChange?.(next);
+  }
+  const tasks = [
+    {
+      name: "Faculty",
+      items: ["faculty", "facultyAvailability", "loadActivities"],
+    },
+    {
+      name: "Subjects & sections",
+      items: ["subjects", "sections", "programs", "curricula"],
+    },
+    { name: "Rooms", items: ["rooms", "roomAvailability"] },
+    { name: "Semesters", items: ["semesters", "academicYears"] },
+  ];
+  const task = tasks.find((t) => t.items.includes(entity));
   async function save(row: Record<string, unknown>) {
     const next = structuredClone(data);
     const collection = next[entity] as unknown as Record<string, unknown>[];
@@ -425,28 +513,59 @@ export function Records({
   }
   return (
     <>
-      <div className="toolbar">
-        <Field label="Record type">
-          <select
-            value={entity}
-            disabled={busy}
-            onChange={(e) => {
-              setEntity(e.target.value as Entity);
-              setEditing(undefined);
-              setSearch("");
-              setSelected([]);
-              setPlan(null);
-              setMessage("");
-              setError("");
-            }}
+      <nav className="task-nav" aria-label="Academic record tasks">
+        {tasks.map((t) => (
+          <button
+            key={t.name}
+            aria-pressed={task?.name === t.name}
+            className={task?.name === t.name ? "active" : ""}
+            onClick={() => chooseEntity(t.items[0] as Entity)}
           >
-            {Object.entries(labels).map(([key, label]) => (
-              <option key={key} value={key}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </Field>
+            {t.name}
+          </button>
+        ))}
+      </nav>
+      {task && (
+        <div className="tabs record-subtabs">
+          {task.items.map((key) => (
+            <button
+              key={key}
+              aria-pressed={entity === key}
+              className={entity === key ? "active" : ""}
+              onClick={() => chooseEntity(key as Entity)}
+            >
+              {key === "faculty"
+                ? "Profiles"
+                : key === "rooms"
+                  ? "Room details"
+                  : key === "subjects"
+                    ? "Subject catalog"
+                    : key === "semesters"
+                      ? "Terms"
+                      : labels[key as Entity]}
+            </button>
+          ))}
+        </div>
+      )}
+      <details className="advanced-record-tools" open={!task || undefined}>
+        <summary>Advanced records and department rules</summary>
+        <div className="toolbar">
+          <Field label="Record type">
+            <select
+              value={entity}
+              disabled={busy}
+              onChange={(e) => chooseEntity(e.target.value as Entity)}
+            >
+              {Object.entries(labels).map(([key, label]) => (
+                <option key={key} value={key}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
+      </details>
+      <div className="toolbar">
         <Field label="Search records">
           <input
             type="search"
@@ -519,12 +638,11 @@ export function Records({
         />
       )}
       <p className="note">
-        Create records in order: academic year → semester → program → curriculum
-        → subjects and sections → offerings. Availability repeats weekly; no
-        faculty windows means unrestricted within scheduling hours. Delete
-        previews show connected records before anything is removed. Deactivate
-        faculty or rooms to keep their history while stopping new assignments or
-        bookings.
+        {task
+          ? `Manage ${task.name.toLowerCase()} here. Select a tab above, search, or add a record.`
+          : "Advanced controls for linked records and department calculation rules."}{" "}
+        Deletion shows a preview first. Deactivate faculty or rooms when you
+        want to keep their history.
       </p>
       {rows.length ? (
         <div className="table-wrap">

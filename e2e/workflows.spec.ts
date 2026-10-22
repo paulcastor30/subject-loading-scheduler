@@ -3,15 +3,29 @@ import { sampleData } from "../tests/fixtures/academicData";
 import { backup } from "../src/lib/storage";
 
 // Provision only through the real backup-restoration UI. No test-data loader is shipped.
-async function restoreTestRecords(page: Page) {
+async function restoreTestRecords(page: Page, records = sampleData()) {
   await page.goto("#settings/import");
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByLabel("Restore JSON backup").setInputFiles({
     name: "automated-test.backup.json",
     mimeType: "application/json",
-    buffer: Buffer.from(backup(sampleData())),
+    buffer: Buffer.from(backup(records)),
   });
   await expect(page.getByText("Backup restored successfully.")).toBeVisible();
+}
+
+async function chooseRecords(page: Page, entity: string) {
+  const picker = page.getByLabel("Record type", { exact: true });
+  if (!(await picker.isVisible()))
+    await page
+      .getByText("Advanced records and department rules", { exact: true })
+      .click();
+  await picker.selectOption(entity);
+}
+function groupCard(page: Page, name: string) {
+  return page
+    .getByRole("article")
+    .filter({ has: page.getByRole("heading", { name, exact: true }) });
 }
 
 test("academic workflow, persistence, room search, exports and backup restore", async ({
@@ -22,17 +36,14 @@ test("academic workflow, persistence, room search, exports and backup restore", 
   await restoreTestRecords(page);
   await page.getByRole("link", { name: "Loading & scheduling" }).click();
   await page.getByRole("button", { name: /CS 201 · BSCS 2A/ }).click();
-  await page.getByLabel("Faculty member").selectOption("fac1");
-  await page
-    .getByRole("button", { name: "Assign faculty", exact: true })
+  const lecture = groupCard(page, "Lecture");
+  await lecture.getByLabel("Faculty for this group").selectOption("fac1");
+  await lecture.getByLabel("Day", { exact: true }).selectOption("1");
+  await lecture.getByLabel("Available room").selectOption("room1");
+  await lecture.getByLabel("End time", { exact: true }).fill("09:00");
+  await lecture
+    .getByRole("button", { name: "Save assignment & meeting", exact: true })
     .click();
-  await expect(
-    page.getByRole("button", { name: "Update faculty" }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "+ Add meeting" }).click();
-  await page.getByLabel("Room", { exact: true }).last().selectOption("room1");
-  await page.getByLabel("Day", { exact: true }).selectOption("1");
-  await page.getByRole("button", { name: "Save record" }).click();
   await expect(
     page.getByText("Tuesday 08:00–09:00", { exact: true }),
   ).toBeVisible();
@@ -139,13 +150,15 @@ test("loaded application edits offline and produces a print-ready PDF", async ({
   await context.setOffline(true);
   await page.getByRole("link", { name: "Loading & scheduling" }).click();
   await page.getByRole("button", { name: /MATH 101 · BSCS 1A/ }).click();
-  await page.getByLabel("Faculty member").selectOption("fac2");
-  await page
-    .getByRole("button", { name: "Assign faculty", exact: true })
+  const lecture = groupCard(page, "Lecture");
+  await lecture.getByLabel("Faculty for this group").selectOption("fac2");
+  await lecture
+    .getByRole("checkbox", { name: "Add a weekly meeting", exact: true })
+    .uncheck();
+  await lecture
+    .getByRole("button", { name: "Save assignment", exact: true })
     .click();
-  await expect(
-    page.getByRole("button", { name: "Update faculty" }),
-  ).toBeVisible();
+  await expect(lecture.getByRole("status")).toContainText("Saved.");
   await page.getByRole("link", { name: "Reports", exact: true }).click();
   await page
     .getByLabel("Report", { exact: true })
@@ -196,6 +209,16 @@ test("production workspace starts empty and backup shortcut opens recovery tools
   await expect(
     page.getByRole("heading", { name: "Backups & local storage" }),
   ).toBeVisible();
+  await page.getByRole("link", { name: "Reports", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Export Excel", exact: true }),
+  ).toBeDisabled();
+  await expect(
+    page.getByRole("link", {
+      name: "Create your semester workspace →",
+      exact: true,
+    }),
+  ).toBeVisible();
 });
 
 test("separate lab groups, parallel rooms, faculty duties and Form 3 report", async ({
@@ -203,7 +226,7 @@ test("separate lab groups, parallel rooms, faculty duties and Form 3 report", as
 }, testInfo) => {
   await restoreTestRecords(page);
   await page.getByRole("button", { name: "Academic records & rules" }).click();
-  await page.getByLabel("Record type", { exact: true }).selectOption("rooms");
+  await chooseRecords(page, "rooms");
   await page.getByRole("button", { name: "+ Add record" }).click();
   await page.getByLabel("Name", { exact: true }).fill("Second laboratory");
   await page.getByLabel("Code", { exact: true }).fill("LAB 2");
@@ -213,38 +236,33 @@ test("separate lab groups, parallel rooms, faculty duties and Form 3 report", as
   await page.getByRole("button", { name: "Save record" }).click();
   await page.getByRole("link", { name: "Loading & scheduling" }).click();
   await page.getByRole("button", { name: /CS 201 · BSCS 2A/ }).click();
-  await page
-    .getByRole("button", { name: "Set up lecture & lab groups →" })
+  const labA = groupCard(page, "Lab A");
+  await labA
+    .getByText("Split, unassign or remove this group", { exact: true })
     .click();
-  const labA = page
-    .getByRole("article")
-    .filter({ has: page.getByRole("heading", { name: "Lab A", exact: true }) });
   await labA.getByRole("button", { name: "Split lab into two" }).click();
   await expect(labA.getByLabel("Students in this group")).toHaveValue("14");
+  const labB = groupCard(page, "Lab 2");
   await labA.getByLabel("Faculty for this group").selectOption("fac1");
-  await labA.getByRole("button", { name: "Save group" }).click();
-  await expect(labA.getByRole("button", { name: "Save group" })).toBeDisabled();
-  const labB = page
-    .getByRole("article")
-    .filter({ has: page.getByRole("heading", { name: "Lab 2", exact: true }) });
   await labB.getByLabel("Faculty for this group").selectOption("fac2");
-  await labB.getByRole("button", { name: "Save group" }).click();
-  await expect(labB.getByRole("button", { name: "Save group" })).toBeDisabled();
   for (const lab of [labA, labB]) {
-    await lab.getByRole("button", { name: "Schedule this group" }).click();
     await lab.getByLabel("Day", { exact: true }).selectOption("1");
     await lab.getByLabel("Start time", { exact: true }).fill("08:00");
     await lab.getByLabel("End time", { exact: true }).fill("11:00");
   }
   await labA.getByLabel("Available room").selectOption("room2");
-  await labA.getByRole("button", { name: "Save meeting", exact: true }).click();
+  await labA
+    .getByRole("button", { name: "Save assignment & meeting", exact: true })
+    .click();
   await expect(
     labA.getByText("Tuesday 08:00–11:00", { exact: true }),
   ).toBeVisible();
   await labB
     .getByLabel("Available room")
     .selectOption({ label: "LAB 2 · 20 seats" });
-  await labB.getByRole("button", { name: "Save meeting", exact: true }).click();
+  await labB
+    .getByRole("button", { name: "Save assignment & meeting", exact: true })
+    .click();
   await expect(
     labB.getByText("Tuesday 08:00–11:00", { exact: true }),
   ).toBeVisible();
@@ -362,6 +380,19 @@ test("semester setup and selected Form 3 import with reviewed group credits", as
   await page.getByLabel("Course title BCA111").fill("Example computing course");
   await page.getByLabel("Course units BCA111").fill("3");
   await page.getByLabel("Year level for B181").selectOption("1");
+  await page.getByRole("link", { name: "Rooms", exact: true }).click();
+  await page.locator(".draft-banner summary").click();
+  await page
+    .getByRole("link", {
+      name: "Continue: Previous loading import →",
+      exact: true,
+    })
+    .click();
+  await expect(page.getByLabel("Course title BCA111")).toHaveValue(
+    "Example computing course",
+  );
+  await expect(page.getByLabel("Course units BCA111")).toHaveValue("3");
+
   await page.getByLabel(/I reviewed this worksheet/).check();
   await page
     .getByRole("button", { name: "Validate and preview loading" })
@@ -394,9 +425,7 @@ test("reviewed semester deletion preserves shared records, supports undo and per
 }) => {
   await restoreTestRecords(page);
   await page.getByRole("button", { name: "Academic records & rules" }).click();
-  await page
-    .getByLabel("Record type", { exact: true })
-    .selectOption("semesters");
+  await chooseRecords(page, "semesters");
   const first = page.getByRole("row").filter({ hasText: "First semester" });
   await first.getByRole("button", { name: "Delete", exact: true }).click();
   await expect(
@@ -417,22 +446,18 @@ test("reviewed semester deletion preserves shared records, supports undo and per
     page.getByText("Deleted 7 records.", { exact: false }),
   ).toBeVisible();
   await expect(first).toHaveCount(0);
-  await page.getByLabel("Record type", { exact: true }).selectOption("faculty");
+  await chooseRecords(page, "faculty");
   await expect(
     page.getByRole("cell", { name: "Alex Rivera (sample)", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "↶ Undo" }).click();
-  await page
-    .getByLabel("Record type", { exact: true })
-    .selectOption("semesters");
+  await chooseRecords(page, "semesters");
   await expect(first).toBeVisible();
   await page.getByRole("button", { name: "↷ Redo" }).click();
   await expect(first).toHaveCount(0);
   await page.reload();
   await page.getByRole("button", { name: "Academic records & rules" }).click();
-  await page
-    .getByLabel("Record type", { exact: true })
-    .selectOption("semesters");
+  await chooseRecords(page, "semesters");
   await expect(first).toHaveCount(0);
   await expect(
     page.getByRole("row").filter({ hasText: "Second semester" }),
@@ -444,9 +469,7 @@ test("bulk deletion, reviewed rule reset and deactivation preserve recoverable h
 }) => {
   await restoreTestRecords(page);
   await page.getByRole("button", { name: "Academic records & rules" }).click();
-  await page
-    .getByLabel("Record type", { exact: true })
-    .selectOption("subjects");
+  await chooseRecords(page, "subjects");
   await page
     .getByRole("checkbox", { name: "Select all visible records" })
     .check();
@@ -463,9 +486,7 @@ test("bulk deletion, reviewed rule reset and deactivation preserve recoverable h
   await expect(
     page.getByRole("cell", { name: "CS 101", exact: true }),
   ).toBeVisible();
-  await page
-    .getByLabel("Record type", { exact: true })
-    .selectOption("workloadRules");
+  await chooseRecords(page, "workloadRules");
   await page
     .getByRole("button", { name: "Reset to defaults", exact: true })
     .click();
@@ -480,7 +501,7 @@ test("bulk deletion, reviewed rule reset and deactivation preserve recoverable h
   await expect(
     page.getByText("Reset 1 record.", { exact: false }),
   ).toBeVisible();
-  await page.getByLabel("Record type", { exact: true }).selectOption("faculty");
+  await chooseRecords(page, "faculty");
   const faculty = page.getByRole("row").filter({ hasText: "Alex Rivera" });
   await faculty
     .getByRole("button", { name: "Deactivate", exact: true })
@@ -500,13 +521,148 @@ test("bulk deletion, reviewed rule reset and deactivation preserve recoverable h
   await page.getByRole("button", { name: /CS 201 · BSCS 2A/ }).click();
   await expect(
     page
-      .getByLabel("Faculty member", { exact: true })
+      .getByLabel("Faculty for this group", { exact: true })
+      .first()
       .locator('option[value="fac1"]'),
   ).toHaveCount(0);
   await page.getByRole("button", { name: "↶ Undo" }).click();
   await page.getByRole("link", { name: "Settings & data" }).click();
-  await page.getByLabel("Record type", { exact: true }).selectOption("faculty");
+  await chooseRecords(page, "faculty");
   await expect(
     faculty.getByRole("button", { name: "Deactivate", exact: true }),
   ).toBeVisible();
+});
+
+test("exact assignment shortcuts and unfinished edits survive navigation and refresh", async ({
+  page,
+}) => {
+  await restoreTestRecords(page);
+  await page.getByRole("link", { name: "Overview", exact: true }).click();
+  await page
+    .locator(".meeting-row")
+    .filter({ hasText: "MATH 101" })
+    .getByRole("button", { name: "Assign →", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "MATH 101 · BSCS 1A", exact: true }),
+  ).toBeVisible();
+  const lecture = groupCard(page, "Lecture");
+  await lecture.getByLabel("Faculty for this group").selectOption("fac2");
+  await page.getByRole("link", { name: "Rooms", exact: true }).click();
+  await page.locator(".draft-banner summary").click();
+  await page.getByRole("link", { name: /Continue: MATH 101/ }).click();
+  await expect(lecture.getByLabel("Faculty for this group")).toHaveValue(
+    "fac2",
+  );
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.reload();
+  await expect(lecture.getByLabel("Faculty for this group")).toHaveValue(
+    "fac2",
+  );
+  await lecture
+    .getByRole("checkbox", { name: "Add a weekly meeting", exact: true })
+    .uncheck();
+  await lecture
+    .getByRole("button", { name: "Save assignment", exact: true })
+    .click();
+  await expect(page.locator(".draft-banner")).toHaveCount(0);
+  await page.getByRole("link", { name: "Settings & data" }).click();
+  await page.getByRole("button", { name: "+ Add record", exact: true }).click();
+  await page
+    .getByLabel("Name", { exact: true })
+    .fill("Unfinished faculty profile");
+  await page.getByRole("link", { name: "Rooms", exact: true }).click();
+  await page.locator(".draft-banner summary").click();
+  await page
+    .getByRole("link", { name: "Continue: Add faculty →", exact: true })
+    .click();
+  await expect(page.getByLabel("Name", { exact: true })).toHaveValue(
+    "Unfinished faculty profile",
+  );
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(page.locator(".draft-banner")).toHaveCount(0);
+  await expect(
+    page.getByRole("cell", { name: "Unfinished faculty profile", exact: true }),
+  ).toHaveCount(0);
+});
+
+test("shared timetable aligns simultaneous classes and supports visible resource filtering", async ({
+  page,
+}, testInfo) => {
+  const records = sampleData();
+  records.assignments.push({
+    id: "parallel-assignment",
+    offeringId: "off2",
+    facultyId: "fac2",
+  });
+  records.meetings.push({
+    id: "parallel-meeting",
+    offeringId: "off2",
+    component: "lecture",
+    roomId: "room3",
+    day: 0,
+    start: "08:00",
+    end: "10:00",
+  });
+  await restoreTestRecords(page, records);
+  await page.getByRole("link", { name: "Loading & scheduling" }).click();
+  await page
+    .getByRole("button", { name: "Weekly timetable", exact: true })
+    .click();
+  await expect(
+    page.getByLabel("Weekly timetable with shared time scale"),
+  ).toBeVisible();
+  const monday = page.getByRole("region", {
+    name: "Monday classes",
+    exact: true,
+  });
+  const a = await monday
+    .getByRole("button", { name: /Edit CS 101/ })
+    .boundingBox();
+  const b = await monday
+    .getByRole("button", { name: /Edit CS 201/ })
+    .boundingBox();
+  expect(a && b).toBeTruthy();
+  expect(a!.y).toBe(b!.y);
+  expect(a!.x).not.toBe(b!.x);
+  expect(a!.height).toBe(b!.height);
+  await page
+    .getByLabel("Faculty timetable", { exact: true })
+    .selectOption("fac1");
+  await expect(page.locator(".time-grid-meeting")).toHaveCount(2);
+  await page.screenshot({
+    path: testInfo.outputPath("weekly-time-grid.png"),
+    fullPage: true,
+  });
+});
+
+test("everyday controls remain usable at laptop and tablet widths", async ({
+  page,
+}, testInfo) => {
+  await restoreTestRecords(page);
+  for (const width of [1280, 1024, 768]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.getByRole("link", { name: "Settings & data" }).click();
+    await page
+      .getByRole("navigation", { name: "Academic record tasks" })
+      .getByRole("button", { name: "Faculty", exact: true })
+      .click();
+    await expect(
+      page.getByRole("button", { name: "+ Add record", exact: true }),
+    ).toBeVisible();
+    await page.getByRole("link", { name: "Loading & scheduling" }).click();
+    await page.getByRole("button", { name: /CS 201 · BSCS 2A/ }).click();
+    await expect(
+      groupCard(page, "Lecture").getByLabel("Faculty for this group"),
+    ).toBeVisible();
+    const dimensions = await page.evaluate(() => ({
+      page: document.documentElement.scrollWidth,
+      viewport: document.documentElement.clientWidth,
+    }));
+    expect(dimensions.page).toBeLessThanOrEqual(dimensions.viewport + 1);
+  }
+  await page.screenshot({
+    path: testInfo.outputPath("tablet-assignment.png"),
+    fullPage: true,
+  });
 });

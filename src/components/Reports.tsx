@@ -96,11 +96,16 @@ export function Reports({
         <button
           className="primary"
           onClick={() => void excel()}
-          disabled={busy}
+          disabled={busy || !term || !report.rows.length}
         >
           {busy ? "Exporting…" : "Export Excel"}
         </button>
-        <button onClick={() => window.print()}>Print / Save PDF</button>
+        <button
+          disabled={!term || !report.rows.length}
+          onClick={() => window.print()}
+        >
+          Print / Save PDF
+        </button>
       </div>
       <div className="report">
         <header className="report-header">
@@ -137,8 +142,21 @@ export function Reports({
               </table>
             </div>
             {!report.rows.length && (
-              <Empty title="No matching records">
-                Choose a semester or adjust the report filters.
+              <Empty
+                title={term ? "No matching records" : "Start with a semester"}
+              >
+                {term ? (
+                  <>
+                    Adjust the filters, or{" "}
+                    <a href="#scheduling/guided">
+                      assign and schedule your classes →
+                    </a>
+                  </>
+                ) : (
+                  <a href="#dashboard/setup">
+                    Create your semester workspace →
+                  </a>
+                )}
               </Empty>
             )}
           </Panel>

@@ -1,3 +1,4 @@
+import { useDraft } from "../lib/drafts";
 import { Form3Import } from "./Form3Import";
 import { readPreference, writePreference } from "../lib/preferences";
 import { useState } from "react";
@@ -30,10 +31,29 @@ export function DataManagement({
   replace: Commit;
   onError: (s: string) => void;
 }) {
-  const [entity, setEntity] = useState<Entity>("faculty"),
-    [raw, setRaw] = useState<RawRow[]>([]),
-    [mapping, setMapping] = useState<Record<string, string>>({}),
-    [preview, setPreview] = useState<ImportPreview | null>(null),
+  const importDraft = useDraft<{
+    entity: Entity;
+    raw: RawRow[];
+    mapping: Record<string, string>;
+  }>(
+    "generic-import",
+    () => ({ entity: "faculty", raw: [], mapping: {} }),
+    "Excel / CSV import",
+    "#settings/import",
+  );
+  const { entity, raw, mapping } = importDraft.value;
+  const setRaw = (raw: RawRow[]) =>
+    importDraft.setValue((v) => ({ ...v, raw }));
+  const setMapping = (
+    value:
+      | Record<string, string>
+      | ((old: Record<string, string>) => Record<string, string>),
+  ) =>
+    importDraft.setValue((v) => ({
+      ...v,
+      mapping: typeof value === "function" ? value(v.mapping) : value,
+    }));
+  const [preview, setPreview] = useState<ImportPreview | null>(null),
     [source, setSource] = useState(""),
     [target, setTarget] = useState(""),
     [copyAssignments, setCopyAssignments] = useState(false),
@@ -181,10 +201,12 @@ export function DataManagement({
               <select
                 value={entity}
                 onChange={(e) => {
-                  setEntity(e.target.value as Entity);
-                  setRaw([]);
+                  importDraft.clear({
+                    entity: e.target.value as Entity,
+                    raw: [],
+                    mapping: {},
+                  });
                   setPreview(null);
-                  setMapping({});
                 }}
               >
                 {importEntities.map((key) => (
@@ -236,6 +258,14 @@ export function DataManagement({
               />
             </label>
           </div>
+          {raw.length > 0 && (
+            <p className="draft-note">
+              File rows and column matches are kept in this tab. Validate again
+              after returning to this screen.{" "}
+              {importDraft.storageError &&
+                "Draft storage is unavailable; finish before leaving this page."}
+            </p>
+          )}
           {raw.length > 0 && (
             <>
               <h3>1. Map columns</h3>
@@ -348,7 +378,7 @@ export function DataManagement({
                         `Imported ${preview.added} valid records. ${preview.errors.length} rejected rows were skipped.`,
                       );
                       setPreview(null);
-                      setRaw([]);
+                      importDraft.clear({ entity, raw: [], mapping: {} });
                     }
                   })
                 }

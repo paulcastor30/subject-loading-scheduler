@@ -1,3 +1,4 @@
+import { useDraft } from "../lib/drafts";
 import { useState, type FormEvent } from "react";
 import { uid, type Data } from "../lib/model";
 import { duplicateSemester } from "../lib/storage";
@@ -12,16 +13,25 @@ export function SemesterSetup({
   commit: Commit;
   onDone: (id: string) => void;
 }) {
-  const [year, setYear] = useState(
-      () => `${new Date().getFullYear()}–${new Date().getFullYear() + 1}`,
-    ),
-    [name, setName] = useState("First semester"),
-    [copy, setCopy] = useState(""),
-    [code, setCode] = useState("BSCA"),
-    [program, setProgram] = useState(
-      "Bachelor of Science in Computer Applications",
-    ),
-    [busy, setBusy] = useState(false),
+  const form = useDraft(
+    "semester-setup",
+    () => ({
+      year: `${new Date().getFullYear()}–${new Date().getFullYear() + 1}`,
+      name: "First semester",
+      copy: "",
+      code: "BSCA",
+      program: "Bachelor of Science in Computer Applications",
+    }),
+    "Semester setup",
+    "#dashboard/setup",
+  );
+  const { year, name, copy, code, program } = form.value;
+  const setYear = (year: string) => form.setValue((v) => ({ ...v, year })),
+    setName = (name: string) => form.setValue((v) => ({ ...v, name })),
+    setCopy = (copy: string) => form.setValue((v) => ({ ...v, copy })),
+    setCode = (code: string) => form.setValue((v) => ({ ...v, code })),
+    setProgram = (program: string) => form.setValue((v) => ({ ...v, program }));
+  const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   async function save(e: FormEvent) {
     e.preventDefault();
@@ -56,8 +66,10 @@ export function SemesterSetup({
           name: `Curriculum · ${year.trim()} (confirm version)`,
         });
       if (copy) next = duplicateSemester(next, copy, semesterId, false);
-      if (await commit(next, "Started a new semester planning workspace"))
+      if (await commit(next, "Started a new semester planning workspace")) {
+        form.clear();
         onDone(semesterId);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to start semester.");
     } finally {
@@ -88,14 +100,16 @@ export function SemesterSetup({
               placeholder="e.g. Second semester · draft 1"
             />
           </Field>
-          <Reference
-            data={data}
-            entity="semesters"
-            label="Copy offerings from"
-            value={copy}
-            onChange={setCopy}
-            empty="Start with no offerings"
-          />
+          {data.semesters.length > 0 && (
+            <Reference
+              data={data}
+              entity="semesters"
+              label="Copy offerings from"
+              value={copy}
+              onChange={setCopy}
+              empty="Start with no offerings"
+            />
+          )}
           {!data.programs.length && (
             <>
               <Field label="Program code">
@@ -115,6 +129,12 @@ export function SemesterSetup({
             </>
           )}
         </div>
+        {form.dirty && (
+          <p className="draft-note">
+            Setup draft kept in this tab. Create the workspace to save these
+            records.
+          </p>
+        )}
         <ErrorMessage message={error} />
         <button className="primary" disabled={busy}>
           {busy ? "Creating…" : "Create semester workspace"}

@@ -1585,3 +1585,259 @@ td .meter {
   background: #edf5ef;
   border-radius: 6px;
 }
+
+/* Everyday administration: readable controls, clear tasks, and protected drafts. */
+@media screen {
+  :root {
+    font-size: 16px;
+  }
+  input,
+  select,
+  button,
+  .file-button {
+    font-size: 14px;
+    min-height: 42px;
+  }
+  .sidebar nav a {
+    font-size: 14px;
+  }
+  .field label,
+  .select-field > label,
+  th {
+    font-size: 14px;
+  }
+  .note,
+  .quiet,
+  .field small,
+  .meeting-row small,
+  .load-preview,
+  .faculty-hints,
+  .group-card small {
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  td {
+    font-size: 14px;
+  }
+  .save-status,
+  .save-error {
+    font-size: 13px;
+  }
+  .welcome {
+    padding: 24px;
+  }
+  .welcome h2 {
+    font-size: 23px;
+  }
+  .checklist-grid button {
+    font-size: 14px;
+  }
+  .checklist-grid small {
+    font-size: 12px;
+  }
+  .form-grid {
+    gap: 16px;
+  }
+  .group-card .form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .group-card {
+    background: white;
+    padding: 20px;
+  }
+  .group-heading h3 {
+    font-size: 19px;
+  }
+  .group-card .select-field {
+    margin-bottom: 12px;
+  }
+}
+.task-nav {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.task-nav .active {
+  color: #fff;
+  background: #24634f;
+  border-color: #24634f;
+}
+.record-subtabs {
+  flex-wrap: wrap;
+}
+.advanced-record-tools,
+.class-advanced {
+  margin: 16px 0;
+  padding: 12px;
+  border: 1px solid #d4dfd8;
+  border-radius: 8px;
+}
+.advanced-record-tools summary,
+.class-advanced summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.advanced-record-tools .toolbar,
+.class-advanced .actions,
+.class-advanced .form-grid {
+  margin-top: 16px;
+}
+.draft-banner {
+  padding: 14px 18px;
+  margin-bottom: 22px;
+  border: 1px solid #c7a65b;
+  border-radius: 8px;
+  background: #fff8e8;
+  font-size: 14px;
+}
+.draft-banner summary {
+  font-weight: 600;
+  cursor: pointer;
+}
+.draft-banner ul {
+  padding-left: 20px;
+  list-style: disc;
+}
+.draft-banner a,
+.empty a,
+.alert a {
+  color: #1f6049;
+  text-decoration: underline;
+  font-weight: 600;
+}
+.draft-note {
+  margin: 12px 0;
+  padding: 10px 12px;
+  border-left: 3px solid #b0882b;
+  background: #fff8e8;
+  font-size: 14px;
+}
+.import-summary {
+  padding: 12px;
+  background: #edf5ef;
+  border-radius: 6px;
+  margin: 12px 0;
+}
+.time-grid-scroll {
+  overflow: auto;
+  max-height: 680px;
+  border-top: 1px solid #d9e2dd;
+}
+.time-grid {
+  display: grid;
+  min-width: 100%;
+  width: max-content;
+}
+.time-grid-heading {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #edf4ef;
+  padding: 12px 8px;
+  text-align: center;
+  border-right: 1px solid #d4dfd8;
+  border-bottom: 1px solid #bacdc1;
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0;
+}
+.time-axis {
+  position: relative;
+  background: white;
+  border-right: 1px solid #bacdc1;
+}
+.time-axis span {
+  position: absolute;
+  left: 5px;
+  font-size: 12px;
+}
+.time-grid-day {
+  position: relative;
+  border-right: 1px solid #d9e2dd;
+  background: repeating-linear-gradient(
+    to bottom,
+    #fff 0,
+    #fff 35px,
+    #edf1ee 35px,
+    #edf1ee 36px,
+    #fff 36px,
+    #fff 71px,
+    #d2dcd5 71px,
+    #d2dcd5 72px
+  );
+}
+.time-grid-day > .quiet {
+  display: block;
+  margin: 14px 5px;
+  font-size: 12px;
+}
+.time-grid-meeting {
+  position: absolute;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 6px;
+  overflow: auto;
+  white-space: normal;
+  font-size: 12px;
+  line-height: 1.35;
+  min-height: 24px;
+  text-align: left;
+}
+.time-grid-meeting.lecture {
+  background: #e4f1e6;
+  border: 1px solid #86ad8e;
+}
+.time-grid-meeting.lab {
+  background: #e4eefb;
+  border: 1px solid #8aa7ce;
+}
+.time-grid-meeting small {
+  font-size: 11px;
+}
+@media (max-width: 760px) {
+  .group-card .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .time-grid-scroll {
+    max-height: 560px;
+  }
+}
+@media print {
+  .draft-banner,
+  .draft-note,
+  .advanced-record-tools,
+  .task-nav {
+    display: none !important;
+  }
+  .time-grid-scroll {
+    max-height: none;
+    overflow: visible;
+  }
+  .time-grid-meeting {
+    font-size: 9px;
+  }
+}
+.saved-class-summary {
+  padding: 8px 0;
+}
+.saved-class-summary p {
+  margin: 8px 0;
+  font-size: 14px;
+}
+.collapse-class {
+  margin-bottom: 14px;
+}
+.draft-banner li {
+  margin: 10px 0;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.draft-banner li button {
+  font-size: 12px;
+  min-height: 32px;
+}

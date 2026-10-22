@@ -1,3 +1,4 @@
+import { useDraft } from "../lib/drafts";
 import { useState } from "react";
 import type { Data } from "../lib/model";
 import type { Commit } from "../lib/useStore";
@@ -24,23 +25,52 @@ export function Form3Import({
   const [file, setFile] = useState<File | null>(null),
     [sheets, setSheets] = useState<string[]>([]),
     [sheet, setSheet] = useState(""),
-    [source, setSource] = useState<FormSource | null>(null),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [message, setMessage] = useState(""),
     [preview, setPreview] = useState<Data | null>(null),
     [base, setBase] = useState<Data | null>(null);
-  const [options, setOptions] = useState<FormOptions>({
-    term,
-    program: data.programs[0]?.id ?? "",
-    maxLoad: 18,
-    schedules: false,
-    overloadsAsWarnings: true,
-    confirmed: false,
-    courses: {},
-    rooms: {},
-    years: {},
-  });
+  const importDraft = useDraft<{
+    source: FormSource | null;
+    options: FormOptions;
+    filename: string;
+  }>(
+    "form3-import",
+    () => ({
+      source: null,
+      filename: "",
+      options: {
+        term,
+        program: data.programs[0]?.id ?? "",
+        maxLoad: 18,
+        schedules: false,
+        overloadsAsWarnings: true,
+        confirmed: false,
+        courses: {},
+        rooms: {},
+        years: {},
+      },
+    }),
+    "Previous loading import",
+    "#settings/import",
+  );
+  const { source, options } = importDraft.value;
+  const setSource = (
+    value: FormSource | null | ((old: FormSource | null) => FormSource | null),
+  ) =>
+    importDraft.setValue((old) => ({
+      ...old,
+      source: typeof value === "function" ? value(old.source) : value,
+    }));
+  const setOptions = (
+    value: FormOptions | ((old: FormOptions) => FormOptions),
+  ) =>
+    importDraft.setValue((old) => ({
+      ...old,
+      options: typeof value === "function" ? value(old.options) : value,
+    }));
+  const [allCourses, setAllCourses] = useState(false),
+    [allRows, setAllRows] = useState(false);
   function change(patch: Partial<FormOptions>) {
     setOptions((o) => ({ ...o, ...patch }));
     setPreview(null);
@@ -101,6 +131,7 @@ export function Form3Import({
       }
       setOptions((o) => ({ ...o, confirmed: false, courses, rooms, years }));
       setSource(parsed);
+      importDraft.setValue((old) => ({ ...old, filename: file.name }));
     });
   }
   const selected = source?.lines.filter((l) => l.include) ?? [],
@@ -203,7 +234,8 @@ export function Form3Import({
           {sheets.length > 0 && (
             <Field label="Loading worksheet">
               <select
-                value={sheet}
+                value={sheet || source?.sheet || ""}
+                disabled={!file || busy}
                 onChange={(e) => void chooseSheet(e.target.value)}
               >
                 <option value="">Choose the version to import</option>
@@ -217,11 +249,19 @@ export function Form3Import({
         <ErrorMessage message={error} />
         {busy && <p role="status">Reading and checking the workbook…</p>}
         {source && (
+          <p className="draft-note">
+            Import review kept in this tab. No records are added until you
+            validate and choose Import reviewed loading.{" "}
+            {importDraft.storageError &&
+              "Draft storage is unavailable; finish before leaving this page."}
+          </p>
+        )}
+        {source && (
           <>
             <div className="import-step">
               <h3>1. Confirm where this loading belongs</h3>
               <p className="note">
-                File: {file?.name}
+                File: {file?.name ?? importDraft.value.filename}
                 <br />
                 Worksheet: {source.sheet}
                 <br />
@@ -370,6 +410,26 @@ export function Form3Import({
                 academic units. Imported group contact hours and reported
                 credits are stored separately.
               </p>
+              <p className="import-summary">
+                {
+                  codes.filter((code) => options.courses[code]?.subjectId)
+                    .length
+                }{" "}
+                courses matched automatically ·{" "}
+                {
+                  codes.filter((code) => !options.courses[code]?.subjectId)
+                    .length
+                }{" "}
+                need confirmed details.
+              </p>
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={allCourses}
+                  onChange={(e) => setAllCourses(e.target.checked)}
+                />
+                Show all courses, including automatic matches
+              </label>
               <div className="table-wrap">
                 <table>
                   <thead>
@@ -381,91 +441,103 @@ export function Form3Import({
                     </tr>
                   </thead>
                   <tbody>
-                    {codes.map((code) => {
-                      const map = options.courses[code] ?? {
-                        subjectId: "",
-                        name: "",
-                        units: "",
-                      };
-                      return (
-                        <tr key={code}>
-                          <td>{code}</td>
-                          <td>
-                            <select
-                              aria-label={`Catalog match ${code}`}
-                              value={map.subjectId}
-                              onChange={(e) =>
-                                change({
-                                  courses: {
-                                    ...options.courses,
-                                    [code]: {
-                                      ...map,
-                                      subjectId: e.target.value,
-                                    },
-                                  },
-                                })
-                              }
-                            >
-                              <option value="">
-                                Create from confirmed details
-                              </option>
-                              {courseSubjects
-                                .filter(
-                                  (s) =>
-                                    s.code.replaceAll(" ", "").toUpperCase() ===
-                                    code,
-                                )
-                                .map((s) => (
-                                  <option key={s.id} value={s.id}>
-                                    {s.code} · {s.name} (
-                                    {
-                                      data.curricula.find(
-                                        (c) => c.id === s.curriculumId,
-                                      )?.name
-                                    }
-                                    )
-                                  </option>
-                                ))}
-                            </select>
-                          </td>
-                          <td>
-                            {!map.subjectId && (
-                              <input
-                                aria-label={`Course title ${code}`}
-                                value={map.name}
+                    {codes
+                      .filter(
+                        (code) =>
+                          allCourses || !options.courses[code]?.subjectId,
+                      )
+                      .map((code) => {
+                        const map = options.courses[code] ?? {
+                          subjectId: "",
+                          name: "",
+                          units: "",
+                        };
+                        return (
+                          <tr key={code}>
+                            <td>{code}</td>
+                            <td>
+                              <select
+                                aria-label={`Catalog match ${code}`}
+                                value={map.subjectId}
                                 onChange={(e) =>
                                   change({
                                     courses: {
                                       ...options.courses,
-                                      [code]: { ...map, name: e.target.value },
+                                      [code]: {
+                                        ...map,
+                                        subjectId: e.target.value,
+                                      },
                                     },
                                   })
                                 }
-                              />
-                            )}
-                          </td>
-                          <td>
-                            {!map.subjectId && (
-                              <input
-                                aria-label={`Course units ${code}`}
-                                type="number"
-                                min="0"
-                                step="0.5"
-                                value={map.units}
-                                onChange={(e) =>
-                                  change({
-                                    courses: {
-                                      ...options.courses,
-                                      [code]: { ...map, units: e.target.value },
-                                    },
-                                  })
-                                }
-                              />
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
+                              >
+                                <option value="">
+                                  Create from confirmed details
+                                </option>
+                                {courseSubjects
+                                  .filter(
+                                    (s) =>
+                                      s.code
+                                        .replaceAll(" ", "")
+                                        .toUpperCase() === code,
+                                  )
+                                  .map((s) => (
+                                    <option key={s.id} value={s.id}>
+                                      {s.code} · {s.name} (
+                                      {
+                                        data.curricula.find(
+                                          (c) => c.id === s.curriculumId,
+                                        )?.name
+                                      }
+                                      )
+                                    </option>
+                                  ))}
+                              </select>
+                            </td>
+                            <td>
+                              {!map.subjectId && (
+                                <input
+                                  aria-label={`Course title ${code}`}
+                                  value={map.name}
+                                  onChange={(e) =>
+                                    change({
+                                      courses: {
+                                        ...options.courses,
+                                        [code]: {
+                                          ...map,
+                                          name: e.target.value,
+                                        },
+                                      },
+                                    })
+                                  }
+                                />
+                              )}
+                            </td>
+                            <td>
+                              {!map.subjectId && (
+                                <input
+                                  aria-label={`Course units ${code}`}
+                                  type="number"
+                                  min="0"
+                                  step="0.5"
+                                  value={map.units}
+                                  onChange={(e) =>
+                                    change({
+                                      courses: {
+                                        ...options.courses,
+                                        [code]: {
+                                          ...map,
+                                          units: e.target.value,
+                                        },
+                                      },
+                                    })
+                                  }
+                                />
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
                   </tbody>
                 </table>
               </div>
@@ -603,6 +675,31 @@ export function Form3Import({
                 remain marked as reported source values. Each separate
                 laboratory group receives its own enrollment and instructor.
               </p>
+              {!source.lines.some(
+                (l) =>
+                  !l.include ||
+                  Boolean(l.problem) ||
+                  !Number.isFinite(l.credit) ||
+                  (l.kind === "teaching" && !l.students),
+              ) && (
+                <p className="alert success">
+                  No row-level corrections flagged. Confirm course details and
+                  the destination below; validation will still check the entire
+                  import.
+                </p>
+              )}
+              <p className="import-summary">
+                Start with rows flagged for attention. Validation still checks
+                every included row, including those hidden below.
+              </p>
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={allRows}
+                  onChange={(e) => setAllRows(e.target.checked)}
+                />
+                Show all source rows
+              </label>
               <div className="table-wrap source-review">
                 <table>
                   <thead>
@@ -618,95 +715,105 @@ export function Form3Import({
                     </tr>
                   </thead>
                   <tbody>
-                    {source.lines.map((l, i) => (
-                      <tr key={l.row}>
-                        <td>
-                          <input
-                            aria-label={`Include source row ${l.row}`}
-                            type="checkbox"
-                            checked={l.include}
-                            onChange={(e) =>
-                              rowChange(i, "include", e.target.checked)
-                            }
-                          />
-                        </td>
-                        <td>
-                          {l.row} · {l.faculty}
-                        </td>
-                        <td>
-                          {l.label}
-                          {l.problem && (
-                            <small className="block danger-text">
-                              Review original time/day: {l.problem}
-                            </small>
-                          )}
-                        </td>
-                        <td>
-                          <input
-                            aria-label={`Time row ${l.row}`}
-                            value={l.time}
-                            onChange={(e) =>
-                              rowChange(i, "time", e.target.value)
-                            }
-                          />
-                        </td>
-                        <td>
-                          <input
-                            aria-label={`Days row ${l.row}`}
-                            value={l.day}
-                            onChange={(e) =>
-                              rowChange(i, "day", e.target.value)
-                            }
-                          />
-                        </td>
-                        <td>
-                          <input
-                            aria-label={`Room row ${l.row}`}
-                            value={l.room}
-                            onChange={(e) =>
-                              rowChange(i, "room", e.target.value)
-                            }
-                          />
-                        </td>
-                        <td>
-                          {l.kind === "teaching" && (
+                    {source.lines
+                      .map((l, i) => ({ l, i }))
+                      .filter(
+                        ({ l }) =>
+                          allRows ||
+                          !l.include ||
+                          Boolean(l.problem) ||
+                          !Number.isFinite(l.credit) ||
+                          (l.kind === "teaching" && !l.students),
+                      )
+                      .map(({ l, i }) => (
+                        <tr key={l.row}>
+                          <td>
                             <input
-                              aria-label={`Students row ${l.row}`}
+                              aria-label={`Include source row ${l.row}`}
+                              type="checkbox"
+                              checked={l.include}
+                              onChange={(e) =>
+                                rowChange(i, "include", e.target.checked)
+                              }
+                            />
+                          </td>
+                          <td>
+                            {l.row} · {l.faculty}
+                          </td>
+                          <td>
+                            {l.label}
+                            {l.problem && (
+                              <small className="block danger-text">
+                                Review original time/day: {l.problem}
+                              </small>
+                            )}
+                          </td>
+                          <td>
+                            <input
+                              aria-label={`Time row ${l.row}`}
+                              value={l.time}
+                              onChange={(e) =>
+                                rowChange(i, "time", e.target.value)
+                              }
+                            />
+                          </td>
+                          <td>
+                            <input
+                              aria-label={`Days row ${l.row}`}
+                              value={l.day}
+                              onChange={(e) =>
+                                rowChange(i, "day", e.target.value)
+                              }
+                            />
+                          </td>
+                          <td>
+                            <input
+                              aria-label={`Room row ${l.row}`}
+                              value={l.room}
+                              onChange={(e) =>
+                                rowChange(i, "room", e.target.value)
+                              }
+                            />
+                          </td>
+                          <td>
+                            {l.kind === "teaching" && (
+                              <input
+                                aria-label={`Students row ${l.row}`}
+                                type="number"
+                                min="1"
+                                value={l.students ?? ""}
+                                onChange={(e) =>
+                                  rowChange(
+                                    i,
+                                    "students",
+                                    e.target.value
+                                      ? Number(e.target.value)
+                                      : undefined,
+                                  )
+                                }
+                              />
+                            )}
+                          </td>
+                          <td>
+                            <input
+                              aria-label={`Credit row ${l.row}`}
                               type="number"
-                              min="1"
-                              value={l.students ?? ""}
+                              step="0.01"
+                              min="0"
+                              value={!Number.isFinite(l.credit) ? "" : l.credit}
                               onChange={(e) =>
                                 rowChange(
                                   i,
-                                  "students",
-                                  e.target.value
-                                    ? Number(e.target.value)
-                                    : undefined,
+                                  "credit",
+                                  e.target.value === ""
+                                    ? NaN
+                                    : Number(e.target.value),
                                 )
                               }
                             />
-                          )}
-                        </td>
-                        <td>
-                          <input
-                            aria-label={`Credit row ${l.row}`}
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={Number.isNaN(l.credit) ? "" : l.credit}
-                            onChange={(e) =>
-                              rowChange(
-                                i,
-                                "credit",
-                                e.target.value === ""
-                                  ? NaN
-                                  : Number(e.target.value),
-                              )
-                            }
-                          />
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                        </tr>
+                      ))}
                   </tbody>
                 </table>
               </div>
@@ -773,7 +880,7 @@ export function Form3Import({
                           )
                         ) {
                           setPreview(null);
-                          setSource(null);
+                          importDraft.clear();
                           setMessage(
                             "Loading imported. Open Loading & scheduling or Faculty loads to continue.",
                           );

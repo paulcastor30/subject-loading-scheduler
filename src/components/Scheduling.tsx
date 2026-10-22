@@ -1,14 +1,15 @@
+import { timetableLayout } from "../lib/timetable";
+import { useDraft } from "../lib/drafts";
 import { GroupWorkspace } from "./GroupWorkspace";
 import {
   assignOfferingFaculty,
-  enableGroups,
   meetingAssignment,
   offeringComplete,
   groupLabel,
 } from "../lib/loading";
 import { useEffect, useMemo, useState } from "react";
 import { days, offeringName, uid, type Data, type Row } from "../lib/model";
-import { suggestions, validate, workload } from "../lib/engine";
+import { validate, minutes, clockTime } from "../lib/engine";
 import type { Commit } from "../lib/useStore";
 import { Badge, Empty, Field, Panel, Reference } from "./UI";
 import { RecordForm } from "./Records";
@@ -27,33 +28,76 @@ export function Timetable({
       ...meetings.map((m) => m.day),
     ]),
   ].sort();
+  const rule = data.schedulingRules[0];
+  const start =
+    Math.floor(
+      Math.min(minutes(rule.start), ...meetings.map((m) => minutes(m.start))) /
+        60,
+    ) * 60;
+  const end =
+    Math.ceil(
+      Math.max(minutes(rule.end), ...meetings.map((m) => minutes(m.end))) / 60,
+    ) * 60;
+  const height = (end - start) * 1.2;
+  const positions = timetableLayout(meetings);
   return (
     <div
-      className="timetable"
-      style={{
-        gridTemplateColumns: `repeat(${enabled.length},minmax(145px,1fr))`,
-      }}
+      className="time-grid-scroll"
+      aria-label="Weekly timetable with shared time scale"
     >
-      {enabled.map((day) => (
-        <section className="timetable-day" key={day}>
-          <h3>{days[day]}</h3>
-          <div className="day-entries">
-            {meetings
-              .filter((m) => m.day === day)
-              .sort((a, b) => a.start.localeCompare(b.start))
-              .map((m) => {
+      <div
+        className="time-grid"
+        style={{
+          gridTemplateColumns: `64px ${enabled.map((day) => `minmax(${Math.max(180, Math.max(1, ...positions.filter((p) => p.meeting.day === day).map((p) => p.lanes)) * 140)}px,1fr)`).join(" ")}`,
+        }}
+      >
+        <div className="time-grid-heading">Time</div>
+        {enabled.map((day) => (
+          <h3 className="time-grid-heading" key={`heading-${day}`}>
+            {days[day]}
+          </h3>
+        ))}
+        <div className="time-axis" style={{ height }}>
+          {Array.from({ length: (end - start) / 60 }, (_, i) => (
+            <span key={i} style={{ top: i * 72 }}>
+              {clockTime(start + i * 60)}
+            </span>
+          ))}
+        </div>
+        {enabled.map((day) => (
+          <section
+            key={day}
+            className="time-grid-day"
+            aria-label={`${days[day]} classes`}
+            style={{ height }}
+          >
+            {positions
+              .filter((p) => p.meeting.day === day)
+              .map(({ meeting: m, lane, lanes }) => {
                 const faculty = data.faculty.find(
                   (f) => f.id === meetingAssignment(data, m)?.facultyId,
                 );
+                const style = {
+                  top: (minutes(m.start) - start) * 1.2,
+                  height: Math.max(
+                    24,
+                    (minutes(m.end) - minutes(m.start)) * 1.2,
+                  ),
+                  left: `calc(${(lane / lanes) * 100}% + 3px)`,
+                  width: `calc(${100 / lanes}% - 6px)`,
+                };
+                const title = `${offeringName(data, m.offeringId)} · ${groupLabel(data, m.groupId)} · ${days[m.day]} ${m.start}–${m.end} · ${data.rooms.find((r) => r.id === m.roomId)?.code} · ${faculty?.name ?? "Faculty unassigned"}`;
                 const content = (
                   <>
-                    <span className="meeting-time">
-                      {m.start} – {m.end}
-                    </span>
-                    <strong>{offeringName(data, m.offeringId)}</strong>
+                    <strong>
+                      {m.start}–{m.end}
+                    </strong>
+                    <span>{offeringName(data, m.offeringId)}</span>
                     <span>
                       {groupLabel(data, m.groupId)} ·{" "}
-                      {m.component === "lab" ? "Laboratory" : "Lecture"} ·{" "}
+                      {m.component === "lab" ? "Lab" : "Lecture"}
+                    </span>
+                    <span>
                       {data.rooms.find((r) => r.id === m.roomId)?.code}
                     </span>
                     <small>{faculty?.name ?? "Faculty unassigned"}</small>
@@ -62,27 +106,35 @@ export function Timetable({
                 return onEdit ? (
                   <button
                     key={m.id}
-                    className={`meeting ${m.component}`}
+                    className={`time-grid-meeting ${m.component}`}
+                    style={style}
+                    title={title}
+                    aria-label={`Edit ${title}`}
                     onClick={() => onEdit(m)}
-                    aria-label={`Edit ${offeringName(data, m.offeringId)} ${days[day]} ${m.start}`}
                   >
                     {content}
                   </button>
                 ) : (
-                  <div key={m.id} className={`meeting ${m.component}`}>
+                  <div
+                    key={m.id}
+                    className={`time-grid-meeting ${m.component}`}
+                    style={style}
+                    title={title}
+                  >
                     {content}
                   </div>
                 );
               })}
             {!meetings.some((m) => m.day === day) && (
-              <p className="quiet">No classes</p>
+              <span className="quiet">No classes</span>
             )}
-          </div>
-        </section>
-      ))}
+          </section>
+        ))}
+      </div>
     </div>
   );
 }
+
 function QuickRow({
   data,
   meeting,
@@ -96,9 +148,24 @@ function QuickRow({
   selected: boolean;
   onSelect: () => void;
 }) {
-  const [draft, setDraft] = useState(meeting);
   const assignment = meetingAssignment(data, meeting);
-  const [faculty, setFaculty] = useState(assignment?.facultyId ?? "");
+  const form = useDraft(
+    `quick:${meeting.id}`,
+    { meeting, faculty: assignment?.facultyId ?? "" },
+    `${offeringName(data, meeting.offeringId)} · ${days[meeting.day]} ${meeting.start}`,
+    "#scheduling/quick",
+  );
+  const draft = form.value.meeting,
+    faculty = form.value.faculty;
+  const setDraft = (
+    value: Row<"meetings"> | ((old: Row<"meetings">) => Row<"meetings">),
+  ) =>
+    form.setValue((old) => ({
+      ...old,
+      meeting: typeof value === "function" ? value(old.meeting) : value,
+    }));
+  const setFaculty = (value: string) =>
+    form.setValue((old) => ({ ...old, faculty: value }));
   const changed =
     JSON.stringify(draft) !== JSON.stringify(meeting) ||
     faculty !== (assignment?.facultyId ?? "");
@@ -124,10 +191,13 @@ function QuickRow({
           facultyId: faculty,
         });
     }
-    await commit(
-      next,
-      `Quick edited ${offeringName(data, meeting.offeringId)}`,
-    );
+    if (
+      await commit(
+        next,
+        `Quick edited ${offeringName(data, meeting.offeringId)}`,
+      )
+    )
+      form.clear({ meeting: draft, faculty });
   }
   return (
     <tr
@@ -137,8 +207,7 @@ function QuickRow({
           void save();
         }
         if (e.key === "Escape") {
-          setDraft(meeting);
-          setFaculty(assignment?.facultyId ?? "");
+          form.clear({ meeting, faculty: assignment?.facultyId ?? "" });
         }
       }}
     >
@@ -230,17 +299,28 @@ export function Scheduling({
   term,
   commit,
   initialMode = "guided",
+  initialOfferingId = "",
 }: {
   data: Data;
   term: string;
   commit: Commit;
   initialMode?: string;
+  initialOfferingId?: string;
 }) {
   const [mode, setMode] = useState(
       initialMode === "new" ? "guided" : initialMode,
     ),
-    [offeringId, setOfferingId] = useState(""),
-    [facultyId, setFacultyId] = useState(""),
+    [offeringId, setOfferingId] = useState(
+      () =>
+        data.offerings.find(
+          (o) => o.semesterId === term && o.id === initialOfferingId,
+        )?.id ??
+        data.offerings.find(
+          (o) => o.semesterId === term && !offeringComplete(data, o.id),
+        )?.id ??
+        data.offerings.find((o) => o.semesterId === term)?.id ??
+        "",
+    ),
     [search, setSearch] = useState(""),
     [onlyUnassigned, setOnlyUnassigned] = useState(false);
   const [program, setProgram] = useState(""),
@@ -257,9 +337,6 @@ export function Scheduling({
     [bulkRoom, setBulkRoom] = useState(""),
     [bulkDay, setBulkDay] = useState("");
   const [fillUnassigned, setFillUnassigned] = useState(true);
-  const [component, setComponent] = useState<"lecture" | "lab">("lecture"),
-    [duration, setDuration] = useState(60),
-    [showSuggestions, setShowSuggestions] = useState(false);
   useEffect(() => {
     if (meeting !== undefined || addingOffering)
       document
@@ -309,7 +386,6 @@ export function Scheduling({
   const activeOffering = data.offerings.find(
     (o) => o.id === offeringId && o.semesterId === term,
   );
-  const assigned = data.assignments.find((a) => a.offeringId === offeringId);
   const issues = useMemo(() => validate(data, term), [data, term]);
   async function assign(
     ids: string[],
@@ -351,29 +427,15 @@ export function Scheduling({
       )
     ) {
       setMeeting(undefined);
-      setShowSuggestions(false);
       return true;
     }
     return false;
   }
-  async function removeMeeting(id: string) {
-    if (!confirm("Remove this class meeting? You can undo this change."))
-      return;
-    await commit(
-      { ...data, meetings: data.meetings.filter((m) => m.id !== id) },
-      "Removed class meeting",
-    );
-  }
-  const recommendations = useMemo(
-    () =>
-      showSuggestions ? suggestions(data, offeringId, component, duration) : [],
-    [data, offeringId, component, duration, showSuggestions],
-  );
   return (
     <>
       <div className="tabs" role="group" aria-label="Scheduling workflow">
         {[
-          ["guided", "Guided assignment"],
+          ["guided", "Assign & schedule"],
           ["quick", "Quick edit"],
           ["timetable", "Weekly timetable"],
           ["issues", "Review & conflicts"],
@@ -477,8 +539,6 @@ export function Scheduling({
                       key={o.id}
                       onClick={() => {
                         setOfferingId(o.id);
-                        setFacultyId(a?.facultyId ?? "");
-                        setShowSuggestions(false);
                       }}
                     >
                       <span>
@@ -506,7 +566,19 @@ export function Scheduling({
                 })}
                 {!offerings.length && (
                   <Empty title="No offerings found">
-                    Add an offering or adjust your filters.
+                    {term ? (
+                      <>
+                        Add a subject and student section for this semester.{" "}
+                        <a href="#settings/subjects">Manage subjects →</a>{" "}
+                        <a href="#settings/sections">Manage sections →</a>
+                      </>
+                    ) : (
+                      <>
+                        Start with{" "}
+                        <a href="#dashboard/setup">semester setup →</a> before
+                        adding classes.
+                      </>
+                    )}
                   </Empty>
                 )}
               </div>
@@ -545,11 +617,6 @@ export function Scheduling({
                       );
                       if (next) {
                         setOfferingId(next.id);
-                        setFacultyId(
-                          data.assignments.find((a) => a.offeringId === next.id)
-                            ?.facultyId ?? "",
-                        );
-                        setShowSuggestions(false);
                       }
                     }}
                   >
@@ -559,183 +626,11 @@ export function Scheduling({
               }
             >
               {activeOffering ? (
-                data.teachingGroups.some((g) => g.offeringId === offeringId) ? (
-                  <GroupWorkspace
-                    data={data}
-                    offeringId={offeringId}
-                    commit={commit}
-                  />
-                ) : (
-                  <div className="padded">
-                    <button
-                      className="setup-groups"
-                      onClick={() =>
-                        void commit(
-                          enableGroups(data, offeringId),
-                          "Set up separate lecture and lab groups",
-                        )
-                      }
-                    >
-                      Set up lecture & lab groups →
-                    </button>
-                    <p className="note">
-                      Choose faculty, then add one or more lecture and
-                      laboratory meetings. Valid changes save locally.
-                    </p>
-                    <Reference
-                      data={data}
-                      entity="faculty"
-                      activeOnly
-                      label="Faculty member"
-                      value={facultyId}
-                      onChange={setFacultyId}
-                      empty="Choose faculty"
-                    />
-                    <div className="faculty-hints">
-                      {data.faculty
-                        .filter((f) => f.active)
-                        .map((f) => (
-                          <span key={f.id}>
-                            {f.name}:{" "}
-                            <strong>
-                              {workload(data, f.id, term)} / {f.maxLoad}
-                            </strong>{" "}
-                            units
-                          </span>
-                        ))}
-                    </div>
-                    <div className="actions">
-                      <button
-                        className="primary"
-                        disabled={!facultyId}
-                        onClick={() => void assign([offeringId], facultyId)}
-                      >
-                        {assigned ? "Update faculty" : "Assign faculty"}
-                      </button>
-                      {assigned && (
-                        <button
-                          onClick={() =>
-                            void commit(
-                              {
-                                ...data,
-                                assignments: data.assignments.filter(
-                                  (a) => a.offeringId !== offeringId,
-                                ),
-                              },
-                              `Unassigned ${offeringName(data, offeringId)}`,
-                            )
-                          }
-                        >
-                          Unassign
-                        </button>
-                      )}
-                    </div>
-                    <hr />
-                    <div className="panel-heading">
-                      <h3>Weekly meetings</h3>
-                      <button
-                        onClick={() =>
-                          setMeeting({
-                            id: uid(),
-                            offeringId,
-                            component: "lecture",
-                            day: 0,
-                            start: "08:00",
-                            end: "09:00",
-                            roomId: "",
-                          })
-                        }
-                      >
-                        + Add meeting
-                      </button>
-                    </div>
-                    {data.meetings
-                      .filter((m) => m.offeringId === offeringId)
-                      .map((m) => (
-                        <div className="meeting-row" key={m.id}>
-                          <span>
-                            <strong>
-                              {days[m.day]} {m.start}–{m.end}
-                            </strong>
-                            <small>
-                              {m.component} ·{" "}
-                              {data.rooms.find((r) => r.id === m.roomId)?.code}
-                            </small>
-                          </span>
-                          <div className="actions">
-                            <button onClick={() => setMeeting({ ...m })}>
-                              Edit
-                            </button>
-                            <button
-                              onClick={() => setMeeting({ ...m, id: uid() })}
-                            >
-                              Duplicate
-                            </button>
-                            <button
-                              className="danger-text"
-                              onClick={() => void removeMeeting(m.id)}
-                            >
-                              Remove
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    <hr />
-                    <h3>Find a suitable schedule</h3>
-                    <div className="toolbar">
-                      <Field label="Component">
-                        <select
-                          value={component}
-                          onChange={(e) => {
-                            setComponent(e.target.value as "lecture" | "lab");
-                            setShowSuggestions(false);
-                          }}
-                        >
-                          <option value="lecture">Lecture</option>
-                          <option value="lab">Laboratory</option>
-                        </select>
-                      </Field>
-                      <Field label="Duration (minutes)">
-                        <input
-                          type="number"
-                          min="15"
-                          max="720"
-                          step="15"
-                          value={duration}
-                          onChange={(e) => {
-                            setDuration(Number(e.target.value));
-                            setShowSuggestions(false);
-                          }}
-                        />
-                      </Field>
-                      <button
-                        disabled={duration < 15 || duration > 720}
-                        onClick={() => setShowSuggestions(true)}
-                      >
-                        Suggest times
-                      </button>
-                    </div>
-                    {showSuggestions &&
-                      (recommendations.length ? (
-                        recommendations.map((m, i) => (
-                          <button
-                            className="suggestion"
-                            key={i}
-                            onClick={() => setMeeting({ ...m, id: uid() })}
-                          >
-                            {days[m.day]} {m.start}–{m.end} ·{" "}
-                            {data.rooms.find((r) => r.id === m.roomId)?.code}
-                            <span>Review →</span>
-                          </button>
-                        ))
-                      ) : (
-                        <p className="note">
-                          No valid slots found. Review availability, faculty
-                          load, or try a shorter meeting.
-                        </p>
-                      ))}
-                  </div>
-                )
+                <GroupWorkspace
+                  data={data}
+                  offeringId={offeringId}
+                  commit={commit}
+                />
               ) : (
                 <Empty title="Select an offering">
                   Choose a subject and section on the left to assign faculty and
@@ -906,7 +801,7 @@ export function Scheduling({
                 <tbody>
                   {meetings.map((m) => (
                     <QuickRow
-                      key={`${m.id}-${JSON.stringify(m)}-${meetingAssignment(data, m)?.facultyId ?? ""}`}
+                      key={m.id}
                       data={data}
                       meeting={m}
                       commit={commit}
@@ -936,6 +831,32 @@ export function Scheduling({
           title="Weekly timetable"
           action={<Badge>Lecture · green / Laboratory · blue</Badge>}
         >
+          <div className="toolbar wrap padded">
+            <Reference
+              data={data}
+              entity="faculty"
+              label="Faculty timetable"
+              value={faculty}
+              onChange={setFaculty}
+              empty="All faculty"
+            />
+            <Reference
+              data={data}
+              entity="sections"
+              label="Section timetable"
+              value={section}
+              onChange={setSection}
+              empty="All sections"
+            />
+            <Reference
+              data={data}
+              entity="rooms"
+              label="Room timetable"
+              value={room}
+              onChange={setRoom}
+              empty="All rooms"
+            />
+          </div>
           <p className="padded note">
             Select any class to edit. Use the faculty, section, or room filters
             for an individual timetable. Times use the 24-hour clock.
@@ -960,11 +881,6 @@ export function Scheduling({
                   <button
                     onClick={() => {
                       setOfferingId(issue.offeringId!);
-                      setFacultyId(
-                        data.assignments.find(
-                          (a) => a.offeringId === issue.offeringId,
-                        )?.facultyId ?? "",
-                      );
                       setMode("guided");
                     }}
                   >
@@ -999,6 +915,8 @@ export function Scheduling({
       {addingOffering && (
         <section className="editor-panel">
           <RecordForm
+            draftKey={`new-offering:${term}`}
+            draftHref="#scheduling/new"
             data={data}
             entity="offerings"
             initial={{

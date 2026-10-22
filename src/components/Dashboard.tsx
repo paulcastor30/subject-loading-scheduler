@@ -11,14 +11,16 @@ export function Dashboard({
   navigate,
   commit,
   onTerm,
+  initialSetup = false,
 }: {
+  initialSetup?: boolean;
   data: Data;
   term: string;
   commit: Commit;
   onTerm: (id: string) => void;
   navigate: (page: string, mode?: string) => void;
 }) {
-  const [showSetup, setShowSetup] = useState(false);
+  const [showSetup, setShowSetup] = useState(initialSetup);
   const offerings = data.offerings.filter((o) => o.semesterId === term);
   const assigned = offerings.filter((o) => offeringComplete(data, o.id));
   const issues = useMemo(() => validate(data, term), [data, term]);
@@ -39,7 +41,9 @@ export function Dashboard({
       <div className="welcome">
         <div>
           <p className="eyebrow">YOUR SEMESTER AT A GLANCE</p>
-          <h2>A clearer week starts here.</h2>
+          <h2>
+            {term ? "Continue preparing your semester" : "Set up your semester"}
+          </h2>
           <p>
             Prepare teaching loads, find the right rooms, and keep every class
             in place.
@@ -47,9 +51,11 @@ export function Dashboard({
         </div>
         <button
           className="primary"
-          onClick={() => navigate("scheduling", "new")}
+          onClick={() =>
+            term ? navigate("scheduling", "new") : setShowSetup(true)
+          }
         >
-          + Add subject offering
+          {term ? "+ Add subject offering" : "Start semester setup"}
         </button>
       </div>
       {!data.semesters.length && (
@@ -111,11 +117,7 @@ export function Dashboard({
             },
             {
               label: "6 · Assign and schedule",
-              done:
-                offerings.length > 0 &&
-                !issues.some((i) =>
-                  ["contact-hours", "unassigned"].includes(i.code),
-                ),
+              done: offerings.length > 0 && issues.length === 0,
               page: "scheduling",
               mode: "issues",
             },
@@ -131,7 +133,17 @@ export function Dashboard({
             >
               <span>{step.done ? "✓" : "○"}</span>
               {step.label}
-              <small>{step.done ? "Ready" : "Continue →"}</small>
+              <small>
+                {step.label.startsWith("6")
+                  ? step.done
+                    ? "Checks passed"
+                    : "Needs review →"
+                  : step.done
+                    ? step.label.startsWith("1")
+                      ? "Selected"
+                      : "Started"
+                    : "Start →"}
+              </small>
             </button>
           ))}
         </div>
@@ -248,7 +260,14 @@ export function Dashboard({
                       {data.subjects.find((s) => s.id === o.subjectId)?.name}
                     </small>
                   </span>
-                  <button onClick={() => navigate("scheduling", "guided")}>
+                  <button
+                    onClick={() =>
+                      navigate(
+                        "scheduling",
+                        `guided?offering=${encodeURIComponent(o.id)}`,
+                      )
+                    }
+                  >
                     Assign →
                   </button>
                 </div>

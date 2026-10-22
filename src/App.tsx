@@ -1,3 +1,4 @@
+import { discardDraft, useDraftList } from "./lib/drafts";
 import { FacultyLoads } from "./components/FacultyLoads";
 import { readPreference, writePreference } from "./lib/preferences";
 import { Component, useEffect, useState, type ReactNode } from "react";
@@ -27,33 +28,54 @@ const descriptions: Record<string, string> = {
   settings: "Maintain academic records and keep your data protected.",
 };
 function readRoute() {
-  const [page, mode] = location.hash.slice(1).split("/");
+  const [page, rest = ""] = location.hash.slice(1).split("/");
+  const [mode, query = ""] = rest.split("?");
   return {
     page: pages.some(([key]) => key === page) ? page : "dashboard",
     mode: mode ?? "",
+    offering: new URLSearchParams(query).get("offering") ?? "",
+    record: new URLSearchParams(query).get("record") ?? "",
   };
 }
 export default function App() {
   const store = useStore(),
     { data, ready, error, setError, status, commit } = store;
+  const drafts = useDraftList();
   const [route, setRoute] = useState(readRoute),
     [chosenTerm, setChosenTerm] = useState(() => readPreference("slss-term")),
     [settingsTab, setSettingsTab] = useState(() =>
-      readRoute().mode === "import" ? "data" : "records",
+      readRoute().mode === "import"
+        ? "data"
+        : readRoute().mode === "guide"
+          ? "guide"
+          : "records",
     );
   const term = data.semesters.some((s) => s.id === chosenTerm)
     ? chosenTerm
     : (data.semesters[0]?.id ?? "");
   useEffect(() => {
-    const listener = () => setRoute(readRoute());
+    const listener = () => {
+      const next = readRoute();
+      setRoute(next);
+      if (next.page === "settings")
+        setSettingsTab(
+          next.mode === "import"
+            ? "data"
+            : next.mode === "guide"
+              ? "guide"
+              : "records",
+        );
+    };
     addEventListener("hashchange", listener);
     return () => removeEventListener("hashchange", listener);
   }, []);
   const navigate = (page: string, mode = "") => {
     if (page === "settings")
-      setSettingsTab(mode === "import" ? "data" : "records");
+      setSettingsTab(
+        mode === "import" ? "data" : mode === "guide" ? "guide" : "records",
+      );
     location.hash = `${page}${mode ? `/${mode}` : ""}`;
-    setRoute({ page, mode });
+    setRoute(readRoute());
   };
   useEffect(() => {
     if (error)
@@ -176,8 +198,9 @@ export default function App() {
                 }
                 role="status"
               >
-                {status.startsWith("Saved") ? "● " : ""}
-                {status}
+                {status.startsWith("Saved")
+                  ? "● Saved academic records"
+                  : status}
               </span>
               <div className="actions">
                 <button
@@ -197,6 +220,39 @@ export default function App() {
               </div>
             </div>
           </div>
+          {drafts.length > 0 && (
+            <details className="draft-banner no-print">
+              <summary>
+                {drafts.length} unfinished{" "}
+                {drafts.length === 1 ? "edit" : "edits"} kept in this tab — not
+                saved records
+              </summary>
+              <p>
+                You can change screens and return to these forms. Save before
+                closing this tab; backups contain saved records only.
+              </p>
+              <ul>
+                {drafts.map((draft, i) => (
+                  <li key={`${draft.href}-${i}`}>
+                    <a href={draft.href}>Continue: {draft.label} →</a>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (
+                          confirm(
+                            `Discard unfinished edits for ${draft.label}? Saved academic records are kept.`,
+                          )
+                        )
+                          discardDraft(draft.key);
+                      }}
+                    >
+                      Discard draft
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
           <div className="no-print">
             <ErrorMessage message={error} />
             {error && (
@@ -216,6 +272,8 @@ export default function App() {
             <>
               {route.page === "dashboard" && (
                 <Dashboard
+                  key={route.mode}
+                  initialSetup={route.mode === "setup"}
                   data={data}
                   term={term}
                   navigate={navigate}
@@ -228,16 +286,18 @@ export default function App() {
               )}{" "}
               {route.page === "scheduling" && (
                 <Scheduling
-                  key={`${term}-${route.mode}`}
+                  key={`${term}-${route.mode}-${route.offering}`}
                   data={data}
                   term={term}
                   commit={commit}
                   initialMode={route.mode || "guided"}
+                  initialOfferingId={route.offering}
                 />
               )}{" "}
               {route.page === "loads" && (
                 <FacultyLoads
-                  key={term}
+                  key={`${term}-${route.mode}`}
+                  initialFaculty={route.mode}
                   data={data}
                   term={term}
                   commit={commit}
@@ -252,28 +312,30 @@ export default function App() {
                   <div className="tabs">
                     <button
                       className={settingsTab === "records" ? "active" : ""}
-                      onClick={() => setSettingsTab("records")}
+                      onClick={() => navigate("settings", "faculty")}
                     >
                       Academic records & rules
                     </button>
                     <button
                       className={settingsTab === "data" ? "active" : ""}
-                      onClick={() => setSettingsTab("data")}
+                      onClick={() => navigate("settings", "import")}
                     >
                       Data management & backups
                     </button>
                     <button
                       className={settingsTab === "guide" ? "active" : ""}
-                      onClick={() => setSettingsTab("guide")}
+                      onClick={() => navigate("settings", "guide")}
                     >
                       Getting started
                     </button>
                   </div>
                   {settingsTab === "records" && (
                     <Records
-                      key={route.mode}
+                      key={`${route.mode}-${route.record}`}
                       data={data}
                       commit={commit}
+                      initialRecordId={route.record}
+                      onEntityChange={(entity) => navigate("settings", entity)}
                       initialEntity={
                         entities.includes(route.mode as Entity)
                           ? (route.mode as Entity)
@@ -295,9 +357,10 @@ export default function App() {
                       <h2>From academic records to a finished schedule</h2>
                       <ol>
                         <li>
-                          <strong>Set up records.</strong> Add an academic year,
-                          semester, program, curriculum, subjects, faculty,
-                          student sections, and rooms. Use Settings → Records.
+                          <strong>Start a semester.</strong> Use Overview →
+                          Start a semester / draft, then add Faculty, Subjects &
+                          sections and Rooms using the task buttons in Academic
+                          records & rules.
                         </li>
                         <li>
                           <strong>Review your rules.</strong> Configure
@@ -311,14 +374,17 @@ export default function App() {
                           semester.
                         </li>
                         <li>
-                          <strong>Assign faculty.</strong> Select an offering,
-                          choose faculty, and save. Review the load shown beside
-                          each faculty member.
+                          <strong>Assign and schedule.</strong> Choose a class,
+                          select faculty and a day/time/available room, then
+                          Save assignment & meeting once. Uncheck Add a weekly
+                          meeting to assign faculty without booking a time yet.
                         </li>
                         <li>
-                          <strong>Add weekly meetings.</strong> Enter lecture
-                          and lab meetings separately. Suggested times check
-                          availability, room fit, and existing classes.
+                          <strong>Edit and repeat.</strong> Completed components
+                          collapse to summaries. Expand one to edit its
+                          meetings, repeat weekdays or change a credit rule.
+                          Suggested times check resource availability and
+                          existing classes.
                         </li>
                         <li>
                           <strong>Review and report.</strong> Resolve missing
@@ -349,7 +415,10 @@ export default function App() {
                         any backup you have, check free browser storage, and
                         reload before retrying. Undo/redo keeps the last 20
                         changes during this session; refresh clears that undo
-                        stack.
+                        stack. Unfinished edits are kept separately in this
+                        tab’s session storage. Use the amber draft list to
+                        return or discard them. Save before closing the tab;
+                        drafts are not included in backups.
                       </p>
                       <h3>Calculation assumptions</h3>
                       <p>

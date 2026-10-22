@@ -66,7 +66,11 @@ export function preparations(data: Data, facultyId: string, term: string) {
       }),
   ).size;
 }
-export function enableGroups(data: Data, offeringId: string): Data {
+export function enableGroups(
+  data: Data,
+  offeringId: string,
+  ids?: Partial<Record<"lecture" | "lab", string>>,
+): Data {
   if (data.teachingGroups.some((g) => g.offeringId === offeringId)) return data;
   const next = structuredClone(data),
     o = next.offerings.find((o) => o.id === offeringId),
@@ -81,7 +85,7 @@ export function enableGroups(data: Data, offeringId: string): Data {
     const hours = component === "lecture" ? s.lectureHours : s.labHours;
     if (hours <= 0) continue;
     const group: Row<"teachingGroups"> = {
-      id: uid(),
+      id: ids?.[component] ?? uid(),
       name: component === "lecture" ? "Lecture" : "Lab A",
       offeringId,
       component,

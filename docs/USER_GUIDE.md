@@ -2,7 +2,7 @@
 
 ## Set up the semester
 
-In **Settings & data → Academic records & rules**, use Record type to create prerequisite records. Start with academic years, semesters, programs, and curricula. Then enter faculty, subjects, sections, and rooms. A curriculum belongs to a program; offerings must pair a subject and section in the same program.
+Start on **Overview → Start a semester / draft**. This creates the academic year, semester, program and initial curriculum together. Then use the task buttons in **Settings & data → Academic records & rules**: Faculty, Subjects & sections, Rooms and Semesters. The full Record type picker and calculation rules remain under **Advanced records and department rules**. A curriculum belongs to a program; offerings must pair a subject and section in the same program.
 
 A subject records **course units**, **lecture contact hours per week**, and **lab contact hours per week** separately. Review your department's workload factors before assigning faculty. New faculty load limits are editable.
 
@@ -13,17 +13,17 @@ Use the **Get the semester ready** checklist on Overview. **Start a semester / d
 ## Assign a class
 
 1. Select the academic term in the top bar.
-2. Open **Loading & scheduling → Guided assignment**.
-3. Add an offering for a subject and student section, or select one from the list.
-4. For separate components, click **Set up lecture & lab groups**. Each group has an instructor, enrollment, contact hours and credited load. Faculty options show current load; selecting one previews the resulting total. Save each group. Existing simple offerings can still use **Assign faculty**.
-5. Use **Split lab into two** for smaller laboratory groups, then **Schedule this group**. Select a day/time to see available rooms that fit its enrollment. Use **Repeat on other days** to save several weekly meetings together. For existing simple offerings, **Add meeting** still works.
-6. Use **Suggest available times** to review a few suitable free room/time combinations. Suggestions check existing faculty and section bookings as well as rooms.
+2. Open **Loading & scheduling → Assign & schedule**, or use a class’s **Assign →** shortcut on Overview.
+3. Add a class for a subject and student section, or choose an existing class. If a prerequisite is missing, follow its creation link; unfinished academic forms remain in this tab.
+4. The app prepares lecture/lab components from subject contact hours. Choose **Faculty for this group**; review the resulting faculty load.
+5. Enter day, start/end and an **Available room**. Use **Suggest available times** or **Repeat on other days** when useful. Click **Save assignment & meeting** to save faculty, credits and bookings together. To assign without scheduling yet, uncheck **Add a weekly meeting** and click **Save assignment**.
+6. Completed components show compact summaries. Use **Edit assignment or meetings** to change one. Inside the expanded form, **Edit meeting** fills the existing meeting rather than creating a duplicate. Expand **Class size, hours and load-credit settings** for enrollment, contact hours, credit categories and sourced overrides. **Split, unassign or remove this group** contains the less frequent structural actions.
 
 Changes save after validation. A blocking error appears at the top; the prior saved version stays intact. Missing faculty and incomplete contact hours are review warnings so you can build a schedule in stages.
 
 ## Make quick changes
 
-Use **Quick edit** for spreadsheet-like editing. Tab moves between day/time/room fields. Save a row with its button or Ctrl/⌘ + Enter; Escape resets its draft. Unsaved rows have a visible label. Save a draft before switching screens.
+Use **Quick edit** for spreadsheet-like editing. Tab moves between day/time/room fields. Save a row with its button or Ctrl/⌘ + Enter; Escape resets its draft. Unsaved rows have a visible label. Unfinished rows remain in this tab when switching screens; save them to update academic records.
 
 Instructor changes in Quick edit affect the matching group’s meetings. Bulk assignment defaults to filling unassigned groups; clear that option only when you intend to replace existing assignments. Use filters to identify offerings for bulk faculty reassignment. Confirm the affected count before applying. Select meeting checkboxes for bulk room/day edits or deletion. An invalid bulk change is rejected as a whole.
 
@@ -75,7 +75,7 @@ The update preserves existing simple offerings and browser records. Database ver
 
 ## Delete records without navigating through dependencies
 
-In **Academic records & rules**, choose the record type. Click a row’s **Delete**, or select several rows (the header checkbox selects all visible filtered rows) and choose **Delete selected**. Selection persists when you filter the same record type; the selected count includes any selected rows hidden by the filter. Use **Clear selection** to start over.
+In **Academic records & rules**, choose the task and subtab. The full record picker remains under **Advanced records and department rules**. Click a row’s **Delete**, or select several rows (the header checkbox selects all visible filtered rows) and choose **Delete selected**. Selection persists when you filter the same record type; the selected count includes any selected rows hidden by the filter. Use **Clear selection** to start over.
 
 The inline review lists names and counts for every affected record. Expand each category to inspect connected records. Deleting a semester removes its offerings, lecture/lab groups, assignments, meetings and other duty credits while keeping shared faculty, subjects, programs, curricula, student sections and rooms. Deleting a year includes its semesters. Deleting faculty removes teaching assignments, duties and availability but keeps class offerings and room bookings for reassignment. Deleting rooms removes their meetings and availability while keeping classes and instructors. Removing a load-credit category keeps groups and converts their current credits to sourced overrides so calculated totals do not change silently.
 
@@ -88,3 +88,13 @@ Faculty and rooms have **Deactivate** and **Activate** actions. You can also sel
 ## Reset required rules
 
 Choose **Workload rule** or **Scheduling rule**, then **Reset to defaults**. Compare current/default values in the preview. Application defaults are not institutional policy. The reset is blocked if it would make existing schedules invalid. No academic records or schedules are deleted. Confirm the reviewed reset, or cancel; session Undo also applies.
+
+## Unfinished edits and saved records
+
+The header’s **Saved academic records** status applies to validated records already in IndexedDB. The amber unfinished-edit list is separate: open it to **Continue** a form or explicitly **Discard draft**. Academic forms, class assignments/meetings, Quick Edit, semester setup, other duties and import reviews keep unfinished values in this tab’s session storage. You can change screens and return, and refresh can recover the draft while that storage remains available. Save before closing the tab or browser; session storage is not a backup. JSON backups include saved academic records only. Storage failures show a warning to finish before leaving. The browser may warn when leaving with unfinished edits.
+
+A recovered import has not imported anything yet. Validate again against current records, then choose the final import action. Form 3 review initially emphasizes unmatched courses and flagged source rows. **Show all courses** and **Show all source rows** reveal the full source for checking or exclusions. Every included row is validated whether visible or hidden.
+
+## Read the weekly timetable
+
+Open **Weekly timetable** and choose a faculty member, student section or room using the visible filters. Classes align on a common time axis; simultaneous classes occupy separate lanes. Select a class to edit it. Large department views can be wider than the screen, so scroll inside the timetable or select a resource to focus it. Room schedules use the same time-grid display.

@@ -31,7 +31,7 @@ The browser tests run against the **production** build on port 4173. Run `pnpm b
 2. Add subjects (student course units, weekly lecture contact hours, weekly laboratory contact hours, equipment), faculty (specialization, load limit), student sections (program, year, class size), and rooms.
 3. Review **Workload rule** and **Scheduling rule**. Configure lecture/lab load factors, working days, opening/closing hours, and the severity of overload. Defaults are examples, not institutional policy.
 4. Select the semester in the header. In **Loading & scheduling**, add subject offerings linking subjects and student sections to that semester.
-5. Choose an offering. Use **Set up lecture & lab groups**, assign an instructor to each component, and use **Split lab into two** if enrollment needs smaller groups. Each group has its own students, contact hours, load credits and meetings. For a simple existing offering, the original whole-offering assignment still works.
+5. Choose a class in **Assign & schedule**. Lecture/lab components are prepared from the subject’s contact hours. Choose faculty and an available room/time, then **Save assignment & meeting** once. Uncheck **Add a weekly meeting** to save faculty only. Expand group controls to split laboratory enrollment or adjust credits.
 6. Review **Review & conflicts** for unassigned offerings and mismatched contact hours. Blocking errors prevent persistence and show an actionable message; valid partial schedules may be saved with visible review warnings.
 7. Generate reports, export a full JSON backup, and optionally finalize the semester in Settings. Reopen the semester before changing its offerings or schedules.
 
@@ -41,7 +41,13 @@ The browser tests run against the **production** build on port 4173. Run `pnpm b
 
 **Overview** now provides a semester-start checklist, one-form term/draft creation, and **Import previous loading**. A new semester can copy offerings and group structure from an existing term without carrying forward its instructors or bookings. Use a distinct draft name for hiring alternatives; never import multiple alternative tabs into the same plan.
 
-**Guided assignment** keeps search and unassigned work visible, with less-used filters under **More filters**. Set up lecture/lab groups in one action. Group instructor choices show current total load, and the form previews the resulting total. Save the group, then choose an available room/time or request suggestions. Several weekdays can be scheduled in one validated save. **Next offering needing work** moves to another incomplete offering. Additional groups can be added, split, edited or explicitly removed together with their assignments and meetings. Save visible drafts before navigating away.
+**Assign & schedule** opens an exact class from dashboard shortcuts and prepares lecture/lab components without a conversion step. Faculty choices show current load; the class previews the resulting total. Select faculty, time and room and save together. Repeated weekdays are validated in the same save. Completed components collapse to readable summaries with an Edit action; unfinished components stay open. Additional groups, splitting and credit overrides remain under expandable controls. Existing ungrouped records are prepared in memory and converted only when a change is saved.
+
+**Task-based records** group everyday work under Faculty, Subjects & sections, Rooms and Semesters. The complete linked-record picker and calculation rules remain under **Advanced records and department rules**. A sole available required parent record is selected automatically. Missing prerequisite records have direct creation links.
+
+**Unfinished edits** are kept in this tab’s session storage for class cards, quick rows, academic forms, semester setup, faculty duties and import review. The header distinguishes saved academic records from unfinished drafts and links to the relevant form. Drafts can survive navigation and refresh while session storage remains available; they are not validated academic records and are not included in JSON backups. Save before closing the tab. Storage failures are shown, and drafts can be discarded explicitly.
+
+**Weekly timetable** uses a shared time axis, aligned class blocks and separate lanes for simultaneous classes. Faculty, section and room filters are visible above the grid. Wider department views scroll within the timetable.
 
 **Quick edit** supports instructor, day, time and room changes. Changing an instructor applies to all meetings for the same group. Bulk assignment defaults to **Fill unassigned groups only**; replacing existing assignments requires clearing that option and confirming the operation. Conflicting bulk edits are rejected together.
 
@@ -150,6 +156,8 @@ src/
     imports.ts       CSV/XLSX parsing, preview validation, downloads
     reports.ts       Deterministic report projections
     useStore.ts      Save state, finalization guard, session undo/redo
+    drafts.ts        Tab-scoped unfinished edits and return links
+    timetable.ts     Deterministic overlap lanes for time-grid rendering
   test/              DOM and IndexedDB test setup
 tests/fixtures/      Synthetic records used only by automated tests
 e2e/                 Production browser workflows
@@ -158,7 +166,7 @@ e2e/                 Production browser workflows
 
 ## Verification and boundaries
 
-[Local verification results](docs/VERIFICATION.md): 88 unit/component tests and 9 production browser tests passed; TypeScript, ESLint, and the production build passed.
+[Local verification results](docs/VERIFICATION.md): 91 unit/component tests and 12 production browser tests passed; TypeScript, ESLint, and the production build passed.
 
 Tests cover faculty/room/section conflicts, adjacency, containment, multiple meetings, different semesters, capacity, equipment/type, availability windows/blocks, load factors and limits, invalid references/duplicates, utilization, valid suggestions, CSV errors, preview imports, backup/restore, semester copying, IndexedDB reopen and stale writes, academic form creation, browser scheduling/editing/refresh, room search, reports, Excel import/export, and backup restoration. The README describes supported behavior rather than guaranteeing task completion times or WCAG certification.
 

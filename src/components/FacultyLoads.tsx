@@ -1,39 +1,66 @@
+import { useDraft } from "../lib/drafts";
 import { useState, type FormEvent } from "react";
 import { uid, type Data, type Row } from "../lib/model";
 import { workload } from "../lib/engine";
 import { otherLoad, preparations, teachingLoad } from "../lib/loading";
 import type { Commit } from "../lib/useStore";
 import { Badge, Empty, Field, Panel, Reference } from "./UI";
-export function FacultyLoads({
+function FacultyLoadWorkspace({
   data,
   term,
   commit,
+  faculty,
+  onChooseFaculty,
 }: {
   data: Data;
   term: string;
   commit: Commit;
+  faculty: string;
+  onChooseFaculty: (id: string) => void;
 }) {
-  const [faculty, setFaculty] = useState(data.faculty[0]?.id ?? ""),
-    [editing, setEditing] = useState<Row<"loadActivities"> | null>(null),
-    [name, setName] = useState(""),
-    [kind, setKind] = useState<Row<"loadActivities">["kind"]>("administration"),
-    [credits, setCredits] = useState(0),
-    [reference, setReference] = useState(""),
-    [busy, setBusy] = useState(false);
+  const form = useDraft<{
+    editing: Row<"loadActivities"> | null;
+    name: string;
+    kind: Row<"loadActivities">["kind"];
+    credits: number;
+    reference: string;
+  }>(
+    `duty:${term}:${faculty}`,
+    () => ({
+      editing: null,
+      name: "",
+      kind: "administration",
+      credits: 0,
+      reference: "",
+    }),
+    `Other duties · ${data.faculty.find((f) => f.id === faculty)?.name ?? "Faculty"}`,
+    `#loads/${faculty}`,
+  );
+  const { editing, name, kind, credits, reference } = form.value;
+  const setEditing = (editing: Row<"loadActivities"> | null) =>
+      form.setValue((v) => ({ ...v, editing })),
+    setName = (name: string) => form.setValue((v) => ({ ...v, name })),
+    setKind = (kind: Row<"loadActivities">["kind"]) =>
+      form.setValue((v) => ({ ...v, kind })),
+    setCredits = (credits: number) => form.setValue((v) => ({ ...v, credits })),
+    setReference = (reference: string) =>
+      form.setValue((v) => ({ ...v, reference }));
+  const [busy, setBusy] = useState(false);
   const teacher = data.faculty.find((f) => f.id === faculty),
     activities = data.loadActivities.filter(
       (a) => a.semesterId === term && a.facultyId === faculty,
     );
   function clearDraft() {
-    setEditing(null);
-    setName("");
-    setKind("administration");
-    setCredits(0);
-    setReference("");
+    form.clear({
+      editing: null,
+      name: "",
+      kind: "administration",
+      credits: 0,
+      reference: "",
+    });
   }
   function chooseFaculty(id: string) {
-    setFaculty(id);
-    clearDraft();
+    onChooseFaculty(id);
   }
   async function save(e: FormEvent) {
     e.preventDefault();
@@ -217,6 +244,12 @@ export function FacultyLoads({
                 </div>
               ))}
               <form onSubmit={save} className="record-form">
+                {form.dirty && (
+                  <p className="draft-note">
+                    Unfinished duty kept in this tab. Choose Save duty to record
+                    these credits.
+                  </p>
+                )}
                 <fieldset disabled={busy} className="duty-fields">
                   <legend>{editing ? "Edit duty" : "Add duty"}</legend>
                   <div className="form-grid">
@@ -284,5 +317,33 @@ export function FacultyLoads({
         </div>
       </Panel>
     </>
+  );
+}
+
+export function FacultyLoads({
+  data,
+  term,
+  commit,
+  initialFaculty = "",
+}: {
+  data: Data;
+  term: string;
+  commit: Commit;
+  initialFaculty?: string;
+}) {
+  const [faculty, setFaculty] = useState(() =>
+    data.faculty.some((f) => f.id === initialFaculty)
+      ? initialFaculty
+      : (data.faculty[0]?.id ?? ""),
+  );
+  return (
+    <FacultyLoadWorkspace
+      key={faculty}
+      data={data}
+      term={term}
+      commit={commit}
+      faculty={faculty}
+      onChooseFaculty={setFaculty}
+    />
   );
 }

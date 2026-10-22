@@ -182,8 +182,8 @@ export function Rooms({ data, term }: { data: Data; term: string }) {
           {room && (
             <>
               <p className="note">
-                Availability and maintenance windows can be edited in Settings →
-                Records → Room availability.
+                Availability and maintenance windows can be edited in Settings &
+                data → Academic records & rules → Rooms → Room availability.
               </p>
               {data.roomAvailability
                 .filter((a) => a.roomId === room)
