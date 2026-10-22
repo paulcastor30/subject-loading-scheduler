@@ -548,9 +548,13 @@ test("exact assignment shortcuts and unfinished edits survive navigation and ref
   ).toBeVisible();
   const lecture = groupCard(page, "Lecture");
   await lecture.getByLabel("Faculty for this group").selectOption("fac2");
+  await page.getByLabel("Academic term", { exact: true }).selectOption("term2");
   await page.getByRole("link", { name: "Rooms", exact: true }).click();
   await page.locator(".draft-banner summary").click();
   await page.getByRole("link", { name: /Continue: MATH 101/ }).click();
+  await expect(page.getByLabel("Academic term", { exact: true })).toHaveValue(
+    "term1",
+  );
   await expect(lecture.getByLabel("Faculty for this group")).toHaveValue(
     "fac2",
   );

@@ -34,7 +34,7 @@ function FacultyLoadWorkspace({
       reference: "",
     }),
     `Other duties · ${data.faculty.find((f) => f.id === faculty)?.name ?? "Faculty"}`,
-    `#loads/${faculty}`,
+    `#loads/${faculty}?term=${encodeURIComponent(term)}`,
   );
   const { editing, name, kind, credits, reference } = form.value;
   const setEditing = (editing: Row<"loadActivities"> | null) =>

@@ -35,6 +35,7 @@ function readRoute() {
     mode: mode ?? "",
     offering: new URLSearchParams(query).get("offering") ?? "",
     record: new URLSearchParams(query).get("record") ?? "",
+    term: new URLSearchParams(query).get("term") ?? "",
   };
 }
 export default function App() {
@@ -50,9 +51,25 @@ export default function App() {
           ? "guide"
           : "records",
     );
-  const term = data.semesters.some((s) => s.id === chosenTerm)
-    ? chosenTerm
-    : (data.semesters[0]?.id ?? "");
+  const requestedTerm =
+    route.term ||
+    (route.page === "scheduling"
+      ? (data.offerings.find((o) => o.id === route.offering)?.semesterId ?? "")
+      : "");
+  const validRequestedTerm = data.semesters.some((s) => s.id === requestedTerm)
+    ? requestedTerm
+    : "";
+  const term =
+    validRequestedTerm ||
+    (data.semesters.some((s) => s.id === chosenTerm)
+      ? chosenTerm
+      : (data.semesters[0]?.id ?? ""));
+  useEffect(() => {
+    if (validRequestedTerm && validRequestedTerm !== chosenTerm) {
+      setChosenTerm(validRequestedTerm);
+      writePreference("slss-term", validRequestedTerm);
+    }
+  }, [validRequestedTerm, chosenTerm]);
   useEffect(() => {
     const listener = () => {
       const next = readRoute();
@@ -159,6 +176,8 @@ export default function App() {
                 onChange={(e) => {
                   setChosenTerm(e.target.value);
                   writePreference("slss-term", e.target.value);
+                  if (route.term || route.offering)
+                    navigate(route.page, route.mode);
                 }}
               >
                 <option value="" disabled>

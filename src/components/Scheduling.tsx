@@ -153,7 +153,7 @@ function QuickRow({
     `quick:${meeting.id}`,
     { meeting, faculty: assignment?.facultyId ?? "" },
     `${offeringName(data, meeting.offeringId)} · ${days[meeting.day]} ${meeting.start}`,
-    "#scheduling/quick",
+    `#scheduling/quick?term=${encodeURIComponent(data.offerings.find((o) => o.id === meeting.offeringId)?.semesterId ?? "")}`,
   );
   const draft = form.value.meeting,
     faculty = form.value.faculty;
@@ -916,7 +916,7 @@ export function Scheduling({
         <section className="editor-panel">
           <RecordForm
             draftKey={`new-offering:${term}`}
-            draftHref="#scheduling/new"
+            draftHref={`#scheduling/new?term=${encodeURIComponent(term)}`}
             data={data}
             entity="offerings"
             initial={{
