@@ -28,6 +28,137 @@ function groupCard(page: Page, name: string) {
     .filter({ has: page.getByRole("heading", { name, exact: true }) });
 }
 
+test("quick entry saves faculty, rooms and subjects with draft recovery and Undo", async ({
+  page,
+}) => {
+  await restoreTestRecords(page);
+  await page.getByRole("button", { name: "Academic records & rules" }).click();
+  await page.getByRole("button", { name: "Quick entry", exact: true }).click();
+  await page.getByLabel("Default load limit").fill("20");
+  await page.getByLabel("Name row 1", { exact: true }).fill("Quick Person One");
+  await page.getByLabel("Name row 1", { exact: true }).press("Enter");
+  await expect(page.getByLabel("Name row 2", { exact: true })).toBeFocused();
+  await page.getByLabel("Name row 2", { exact: true }).fill("Quick Person Two");
+  await page.getByRole("link", { name: "Rooms", exact: true }).click();
+  await page.locator(".draft-banner summary").click();
+  await page
+    .getByRole("link", { name: /Continue: Quick entry · faculty/ })
+    .click();
+  await page.reload();
+  await expect(page.getByLabel("Name row 2", { exact: true })).toHaveValue(
+    "Quick Person Two",
+  );
+  await expect(page.getByLabel("Default load limit")).toHaveValue("20");
+  await page
+    .getByRole("button", { name: "Save 2 faculty records", exact: true })
+    .click();
+  await expect(page.getByText(/Saved 2 faculty records/)).toBeVisible();
+  await page.getByRole("button", { name: "Back to records" }).click();
+  await expect(
+    page.getByRole("row", { name: /Quick Person One/ }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "↶ Undo" }).click();
+  await expect(page.getByRole("row", { name: /Quick Person One/ })).toHaveCount(
+    0,
+  );
+  await expect(page.getByRole("row", { name: /Quick Person Two/ })).toHaveCount(
+    0,
+  );
+  await page.getByRole("button", { name: "↷ Redo" }).click();
+  await expect(
+    page.getByRole("row", { name: /Quick Person Two/ }),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: "Rooms", exact: true }).click();
+  await page.getByRole("button", { name: "Quick entry", exact: true }).click();
+  await page.getByLabel("Default building").fill("New building");
+  await page.getByLabel("Default type").selectOption("laboratory");
+  await page.getByLabel("Default capacity").fill("45");
+  await page
+    .getByText("Paste rows from Excel or a list", { exact: true })
+    .click();
+  await page
+    .getByLabel("Pasted rows")
+    .fill(
+      "Code\tName\nLAB Q1\tQuick laboratory one\nLAB Q2\tQuick laboratory two",
+    );
+  await page.getByRole("button", { name: "Add pasted rows" }).click();
+  await page.getByLabel("Capacity row 2", { exact: true }).fill("50");
+  await page
+    .getByRole("button", { name: "Save 2 room records", exact: true })
+    .click();
+  await expect(page.getByText(/Saved 2 room records/)).toBeVisible();
+  await page.getByRole("button", { name: "Back to records" }).click();
+  await expect(page.getByRole("row", { name: /LAB Q1/ })).toContainText("45");
+  await expect(page.getByRole("row", { name: /LAB Q2/ })).toContainText("50");
+
+  await page
+    .getByRole("button", { name: "Subjects & sections", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Quick entry", exact: true }).click();
+  await page.getByLabel("Default lecture hours").fill("2");
+  await page.getByLabel("Default lab hours").fill("3");
+  await page
+    .getByText("Paste rows from Excel or a list", { exact: true })
+    .click();
+  await page
+    .getByLabel("Pasted rows")
+    .fill(
+      "Code\tTitle\tUnits\nQ101\tQuick subject one\t3\nq101\tQuick subject two\t3",
+    );
+  await page.getByRole("button", { name: "Add pasted rows" }).click();
+  await expect(page.getByLabel("Code row 1", { exact: true })).toHaveAttribute(
+    "aria-invalid",
+    "true",
+  );
+  await expect(
+    page.getByRole("button", { name: "Save 2 subject records", exact: true }),
+  ).toBeDisabled();
+  await page.getByLabel("Code row 2", { exact: true }).fill("Q102");
+  await page.getByLabel("Lab hours row 2", { exact: true }).fill("0");
+  await page.getByLabel("Show optional columns").check();
+  await page.getByLabel("Equipment row 1", { exact: true }).fill("Projector");
+  await page.reload();
+  await expect(page.getByLabel("Equipment row 1", { exact: true })).toHaveValue(
+    "Projector",
+  );
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const entryRow = await page
+    .getByRole("region", { name: "Editable entry table" })
+    .getByRole("row")
+    .nth(1)
+    .boundingBox();
+  expect(entryRow!.height).toBeLessThan(120);
+  await page.screenshot({
+    path: "test-results/quick-entry-desktop.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 768, height: 1024 });
+  await expect
+    .poll(() =>
+      page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+    )
+    .toBe(true);
+  await page
+    .getByRole("button", { name: "Save 2 subject records", exact: true })
+    .scrollIntoViewIfNeeded();
+  await page.screenshot({
+    path: "test-results/quick-entry-tablet.png",
+    fullPage: true,
+  });
+  await page
+    .getByRole("button", { name: "Save 2 subject records", exact: true })
+    .click();
+  await expect(page.getByText(/Saved 2 subject records/)).toBeVisible();
+  await page.getByRole("button", { name: "Back to records" }).click();
+  await page.reload();
+  await expect(page.getByRole("row", { name: /Q101/ })).toContainText(
+    "Projector",
+  );
+  await expect(page.getByRole("row", { name: /Q102/ })).toBeVisible();
+  await expect(page.locator(".draft-banner")).toHaveCount(0);
+});
+
 test("manual setup guides repeated entry, batch classes, scheduling and refresh", async ({
   page,
 }) => {

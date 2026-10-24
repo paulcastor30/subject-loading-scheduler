@@ -1,4 +1,5 @@
 import { useDraft } from "../lib/drafts";
+import { QuickEntry } from "./QuickEntry";
 import { useRef, useState, type FormEvent } from "react";
 import {
   days,
@@ -469,7 +470,7 @@ export function Records({
   commit: Commit;
   initialEntity?: Entity;
   initialRecordId?: string;
-  onEntityChange?: (entity: Entity) => void;
+  onEntityChange?: (entity: Entity, record?: string) => void;
 }) {
   const [entity, setEntity] = useState<Entity>(initialEntity),
     [editing, setEditing] = useState<
@@ -490,6 +491,11 @@ export function Records({
     [message, setMessage] = useState(""),
     [error, setError] = useState("");
   const [formSequence, setFormSequence] = useState(0);
+  const [quickEntry, setQuickEntry] = useState(initialRecordId === "quick");
+  const quickEntity =
+    entity === "subjects" || entity === "faculty" || entity === "rooms"
+      ? entity
+      : null;
   const [preset, setPreset] = useState<Record<string, unknown>>({});
   const returnFocus = useRef<HTMLElement | null>(null);
   const singleton = ["workloadRules", "schedulingRules"].includes(entity);
@@ -501,6 +507,7 @@ export function Records({
       ),
   );
   function chooseEntity(next: Entity) {
+    setQuickEntry(false);
     setEntity(next);
     setEditing(undefined);
     setSearch("");
@@ -641,230 +648,263 @@ export function Records({
           ))}
         </div>
       )}
-      <details className="advanced-record-tools" open={!task || undefined}>
-        <summary>Advanced records and department rules</summary>
-        <div className="toolbar">
-          <Field label="Record type">
-            <select
-              value={entity}
-              disabled={busy}
-              onChange={(e) => chooseEntity(e.target.value as Entity)}
-            >
-              {Object.entries(labels).map(([key, label]) => (
-                <option key={key} value={key}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </Field>
-        </div>
-      </details>
-      <div className="toolbar">
-        <Field label="Search records">
-          <input
-            type="search"
-            disabled={busy}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search any field…"
-          />
-        </Field>
-        {!singleton && (
-          <button
-            className="primary"
-            disabled={busy}
-            onClick={() => {
-              setPlan(null);
-              setEditing(null);
-            }}
-          >
-            + Add record
-          </button>
-        )}
-      </div>
-      {!singleton && selected.length > 0 && (
-        <div className="toolbar wrap selection-toolbar">
-          <strong>{selected.length} selected</strong>
-          <button
-            disabled={busy}
-            className="danger-text"
-            onClick={() => review("delete", selected)}
-          >
-            Delete selected
-          </button>
-          {(entity === "faculty" || entity === "rooms") && (
-            <button
-              disabled={busy}
-              onClick={() => review("deactivate", selected)}
-            >
-              Deactivate selected
-            </button>
-          )}
-          <button disabled={busy} onClick={() => setSelected([])}>
-            Clear selection
-          </button>
-        </div>
-      )}
-      <ErrorMessage message={error} />
-      {message && (
-        <div className="alert success" role="status">
-          {message}
-        </div>
-      )}
-      {plan && (
-        <RecordChangeReview
-          plan={plan}
+      {quickEntry && quickEntity ? (
+        <QuickEntry
+          key={entity}
           data={data}
-          busy={busy}
-          onApply={() => void applyChange()}
-          onCancel={closeReview}
-          onRefresh={() => setPlan(planRecordChange(data, plan.request))}
+          entity={quickEntity}
+          commit={commit}
+          onClose={() => {
+            setQuickEntry(false);
+            onEntityChange?.(entity);
+          }}
         />
-      )}
-      {editing !== undefined && (
-        <RecordForm
-          key={`${entity}-${editing?.id ?? "new"}-${formSequence}`}
-          data={data}
-          entity={entity}
-          initial={editing ?? undefined}
-          allowAddAnother={!singleton}
-          preset={preset}
-          onSave={save}
-          onCancel={() => setEditing(undefined)}
-        />
-      )}
-      <p className="note">
-        {task
-          ? `Manage ${task.name.toLowerCase()} here. Select a tab above, search, or add a record.`
-          : "Advanced controls for linked records and department calculation rules."}{" "}
-        Deletion shows a preview first. Deactivate faculty or rooms when you
-        want to keep their history.
-      </p>
-      {rows.length ? (
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                {!singleton && (
-                  <th>
-                    <input
-                      type="checkbox"
-                      aria-label="Select all visible records"
-                      disabled={busy}
-                      checked={
-                        rows.length > 0 &&
-                        rows.every((r) => selected.includes(String(r.id)))
-                      }
-                      onChange={(e) =>
-                        setSelected(
-                          e.target.checked
-                            ? [
-                                ...new Set([
-                                  ...selected,
-                                  ...rows.map((r) => String(r.id)),
-                                ]),
-                              ]
-                            : selected.filter(
-                                (id) => !rows.some((r) => r.id === id),
-                              ),
-                        )
-                      }
-                    />
-                  </th>
-                )}
-                {fields.map((f) => (
-                  <th key={f}>{human(f)}</th>
-                ))}
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={String(r.id)}>
-                  {!singleton && (
-                    <td>
-                      <input
-                        type="checkbox"
-                        aria-label={`Select ${recordDescription(data, entity, String(r.id))}`}
-                        disabled={busy}
-                        checked={selected.includes(String(r.id))}
-                        onChange={(e) =>
-                          setSelected(
-                            e.target.checked
-                              ? [...selected, String(r.id)]
-                              : selected.filter((id) => id !== r.id),
-                          )
-                        }
-                      />
-                    </td>
-                  )}
-                  {fields.map((f) => (
-                    <td key={f}>
-                      {refs[entity]?.[f]
-                        ? rowName(data, refs[entity]![f], String(r[f] ?? "—"))
-                        : f === "day"
-                          ? days[Number(r[f])]
-                          : typeof r[f] === "boolean"
-                            ? r[f]
-                              ? "Yes"
-                              : "No"
-                            : Array.isArray(r[f])
-                              ? (r[f] as number[])
-                                  .map((i) => days[i].slice(0, 3))
-                                  .join(", ")
-                              : String(r[f] ?? "—")}
-                    </td>
-                  ))}
-                  <td className="row-actions">
-                    <button
-                      disabled={busy}
-                      onClick={() => {
-                        setPlan(null);
-                        setEditing(r);
-                      }}
-                    >
-                      Edit
-                    </button>
-                    {singleton && (
-                      <button
-                        disabled={busy}
-                        onClick={() => review("reset", [String(r.id)])}
-                      >
-                        Reset to defaults
-                      </button>
-                    )}
-                    {(entity === "faculty" || entity === "rooms") && (
-                      <button
-                        disabled={busy}
-                        onClick={() =>
-                          review(r.active ? "deactivate" : "activate", [
-                            String(r.id),
-                          ])
-                        }
-                      >
-                        {r.active ? "Deactivate" : "Activate"}
-                      </button>
-                    )}
-                    {!singleton && (
-                      <button
-                        className="danger-text"
-                        disabled={busy}
-                        onClick={() => review("delete", [String(r.id)])}
-                      >
-                        Delete
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
       ) : (
-        <Empty title={`No ${labels[entity].toLowerCase()} yet`}>
-          Add a record to get started. Changes save automatically after
-          validation.
-        </Empty>
+        <>
+          <details className="advanced-record-tools" open={!task || undefined}>
+            <summary>Advanced records and department rules</summary>
+            <div className="toolbar">
+              <Field label="Record type">
+                <select
+                  value={entity}
+                  disabled={busy}
+                  onChange={(e) => chooseEntity(e.target.value as Entity)}
+                >
+                  {Object.entries(labels).map(([key, label]) => (
+                    <option key={key} value={key}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+          </details>
+          <div className="toolbar">
+            <Field label="Search records">
+              <input
+                type="search"
+                disabled={busy}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search any field…"
+              />
+            </Field>
+            {!singleton && (
+              <button
+                className="primary"
+                disabled={busy}
+                onClick={() => {
+                  setPlan(null);
+                  setEditing(null);
+                }}
+              >
+                + Add record
+              </button>
+            )}
+            {quickEntity && (
+              <button
+                className="primary"
+                disabled={busy}
+                onClick={() => {
+                  setQuickEntry(true);
+                  setEditing(undefined);
+                  setPlan(null);
+                  onEntityChange?.(entity, "quick");
+                }}
+              >
+                Quick entry
+              </button>
+            )}
+          </div>
+          {!singleton && selected.length > 0 && (
+            <div className="toolbar wrap selection-toolbar">
+              <strong>{selected.length} selected</strong>
+              <button
+                disabled={busy}
+                className="danger-text"
+                onClick={() => review("delete", selected)}
+              >
+                Delete selected
+              </button>
+              {(entity === "faculty" || entity === "rooms") && (
+                <button
+                  disabled={busy}
+                  onClick={() => review("deactivate", selected)}
+                >
+                  Deactivate selected
+                </button>
+              )}
+              <button disabled={busy} onClick={() => setSelected([])}>
+                Clear selection
+              </button>
+            </div>
+          )}
+          <ErrorMessage message={error} />
+          {message && (
+            <div className="alert success" role="status">
+              {message}
+            </div>
+          )}
+          {plan && (
+            <RecordChangeReview
+              plan={plan}
+              data={data}
+              busy={busy}
+              onApply={() => void applyChange()}
+              onCancel={closeReview}
+              onRefresh={() => setPlan(planRecordChange(data, plan.request))}
+            />
+          )}
+          {editing !== undefined && (
+            <RecordForm
+              key={`${entity}-${editing?.id ?? "new"}-${formSequence}`}
+              data={data}
+              entity={entity}
+              initial={editing ?? undefined}
+              allowAddAnother={!singleton}
+              preset={preset}
+              onSave={save}
+              onCancel={() => setEditing(undefined)}
+            />
+          )}
+          <p className="note">
+            {task
+              ? `Manage ${task.name.toLowerCase()} here. Select a tab above, search, or add a record.`
+              : "Advanced controls for linked records and department calculation rules."}{" "}
+            Deletion shows a preview first. Deactivate faculty or rooms when you
+            want to keep their history.
+          </p>
+          {rows.length ? (
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    {!singleton && (
+                      <th>
+                        <input
+                          type="checkbox"
+                          aria-label="Select all visible records"
+                          disabled={busy}
+                          checked={
+                            rows.length > 0 &&
+                            rows.every((r) => selected.includes(String(r.id)))
+                          }
+                          onChange={(e) =>
+                            setSelected(
+                              e.target.checked
+                                ? [
+                                    ...new Set([
+                                      ...selected,
+                                      ...rows.map((r) => String(r.id)),
+                                    ]),
+                                  ]
+                                : selected.filter(
+                                    (id) => !rows.some((r) => r.id === id),
+                                  ),
+                            )
+                          }
+                        />
+                      </th>
+                    )}
+                    {fields.map((f) => (
+                      <th key={f}>{human(f)}</th>
+                    ))}
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r) => (
+                    <tr key={String(r.id)}>
+                      {!singleton && (
+                        <td>
+                          <input
+                            type="checkbox"
+                            aria-label={`Select ${recordDescription(data, entity, String(r.id))}`}
+                            disabled={busy}
+                            checked={selected.includes(String(r.id))}
+                            onChange={(e) =>
+                              setSelected(
+                                e.target.checked
+                                  ? [...selected, String(r.id)]
+                                  : selected.filter((id) => id !== r.id),
+                              )
+                            }
+                          />
+                        </td>
+                      )}
+                      {fields.map((f) => (
+                        <td key={f}>
+                          {refs[entity]?.[f]
+                            ? rowName(
+                                data,
+                                refs[entity]![f],
+                                String(r[f] ?? "—"),
+                              )
+                            : f === "day"
+                              ? days[Number(r[f])]
+                              : typeof r[f] === "boolean"
+                                ? r[f]
+                                  ? "Yes"
+                                  : "No"
+                                : Array.isArray(r[f])
+                                  ? (r[f] as number[])
+                                      .map((i) => days[i].slice(0, 3))
+                                      .join(", ")
+                                  : String(r[f] ?? "—")}
+                        </td>
+                      ))}
+                      <td className="row-actions">
+                        <button
+                          disabled={busy}
+                          onClick={() => {
+                            setPlan(null);
+                            setEditing(r);
+                          }}
+                        >
+                          Edit
+                        </button>
+                        {singleton && (
+                          <button
+                            disabled={busy}
+                            onClick={() => review("reset", [String(r.id)])}
+                          >
+                            Reset to defaults
+                          </button>
+                        )}
+                        {(entity === "faculty" || entity === "rooms") && (
+                          <button
+                            disabled={busy}
+                            onClick={() =>
+                              review(r.active ? "deactivate" : "activate", [
+                                String(r.id),
+                              ])
+                            }
+                          >
+                            {r.active ? "Deactivate" : "Activate"}
+                          </button>
+                        )}
+                        {!singleton && (
+                          <button
+                            className="danger-text"
+                            disabled={busy}
+                            onClick={() => review("delete", [String(r.id)])}
+                          >
+                            Delete
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <Empty title={`No ${labels[entity].toLowerCase()} yet`}>
+              Add a record to get started. Changes save automatically after
+              validation.
+            </Empty>
+          )}
+        </>
       )}
     </>
   );

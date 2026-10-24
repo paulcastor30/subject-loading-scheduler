@@ -1823,6 +1823,155 @@ td .meter {
 .saved-class-summary {
   padding: 8px 0;
 }
+.quick-entry {
+  padding: 22px;
+  background: white;
+  border: 1px solid #d4dfd8;
+  border-radius: 10px;
+  margin: 18px 0;
+  min-width: 0;
+}
+.quick-entry-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+}
+.quick-entry h2 {
+  font-size: 21px;
+  margin: 0 0 8px;
+}
+.quick-entry h3 {
+  margin: 0 0 8px;
+}
+.quick-entry-heading p {
+  max-width: 65ch;
+  margin: 0 0 18px;
+}
+.quick-entry-fields {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.quick-defaults {
+  background: #f0f6f2;
+  padding: 16px;
+  border: 1px solid #d4dfd8;
+  border-radius: 8px;
+  margin: 12px 0 18px;
+}
+.quick-defaults .form-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
+}
+.quick-entry-tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 16px 0;
+}
+.quick-entry-tools > span {
+  margin-left: auto;
+  color: #52675c;
+}
+.quick-entry-scroll {
+  border: 1px solid #d4dfd8;
+  border-radius: 8px;
+  max-height: 520px;
+}
+.quick-entry-scroll th[scope="row"] {
+  vertical-align: top;
+  padding-top: 22px;
+}
+.quick-entry-scroll td {
+  vertical-align: top;
+  min-width: 110px;
+}
+.quick-entry-scroll td input,
+.quick-entry-scroll td select {
+  width: 100%;
+  min-width: 85px;
+  font-size: 14px;
+}
+.quick-entry-scroll .quick-cell-code {
+  min-width: 120px;
+}
+.quick-entry-scroll .quick-cell-name {
+  min-width: 220px;
+}
+.quick-entry-scroll .quick-cell-number {
+  min-width: 100px;
+}
+.quick-entry-scroll .quick-cell-building {
+  min-width: 160px;
+}
+.quick-entry-scroll .quick-cell-equipment,
+.quick-entry-scroll .quick-cell-specialization {
+  min-width: 180px;
+}
+.quick-entry-scroll [aria-invalid="true"] {
+  border-color: #ac3f37;
+  background: #fff7f5;
+}
+.quick-field-error {
+  color: #97352f;
+  display: block;
+  white-space: normal;
+  max-width: 30ch;
+  margin-top: 6px;
+  font-size: 12px;
+}
+.quick-row-actions > div {
+  display: flex;
+  gap: 6px;
+}
+.quick-row-actions button {
+  min-height: 36px;
+  font-size: 12px;
+}
+.quick-paste {
+  margin: 18px 0;
+  padding: 14px;
+  border: 1px solid #d4dfd8;
+  border-radius: 8px;
+}
+.quick-paste summary {
+  font-weight: 600;
+  cursor: pointer;
+}
+.quick-paste textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 110px;
+  border: 1px solid #cdd8d1;
+  border-radius: 6px;
+  padding: 10px;
+  font: inherit;
+}
+.quick-paste > button {
+  margin-top: 10px;
+}
+.quick-save-bar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 0;
+}
+@media (max-width: 760px) {
+  .quick-entry {
+    padding: 14px;
+  }
+  .quick-entry-heading {
+    flex-direction: column;
+    gap: 0;
+  }
+  .quick-entry-heading > button {
+    margin-bottom: 12px;
+  }
+}
 .semester-guide {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(260px, 1fr);

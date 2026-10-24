@@ -16,6 +16,18 @@ In **Add classes**, choose a student section and tick the subjects it will take.
 
 Use the **Get the semester ready** checklist on Overview. **Start a semester / draft** creates the year and term together. You can copy prior offerings and group structure without copying instructors or meetings. Use different draft names for hiring scenarios. Checklist items open the relevant records screen; **Import previous loading** opens the reviewed Form 3 importer.
 
+## Enter many subjects, faculty members or rooms
+
+Open **Settings & data → Academic records & rules**, choose Faculty, Subjects or Rooms, then **Quick entry** beside **Add record**.
+
+1. Set **Shared defaults** once for the batch. Subjects use one curriculum plus course units and weekly lecture/lab contact hours; faculty use a credited load limit per semester; rooms use building, room type and student capacity. Confirm the example values against your department's rules. Blank cells use these defaults; a value entered in a row overrides the default, including an explicit zero.
+2. Type directly in the table. Tab moves through controls. Enter in a cell moves to the next row's first cell and adds a row when needed. Use **Add row**, **Duplicate** or **Remove** for unfinished entries. **Show optional columns** reveals equipment or faculty specialization/rank. Optional values remain part of the batch when the columns are hidden.
+3. To paste, expand **Paste rows from Excel or a list**. Copy tab-separated Excel cells, or paste one faculty name per line. Use the column order displayed above the paste box, or recognized headers such as Code, Title, Course units, Lecture hours and Lab hours for subjects. Faculty columns are Name, Load limit, Specialization and Rank; room columns are Code, Name, Building, Type, Capacity and Equipment. Later columns may be omitted to use shared defaults. Choose **Add pasted rows** to append below entered rows; existing draft entries are kept.
+4. Correct field messages and duplicates. Subject codes must be unique in the selected curriculum; room codes must be unique. Matching faculty names are flagged to avoid accidental repeats; review the roster or use the individual **Add record** form for a distinct person with the same name. Completely blank rows are ignored. A batch accepts at most 500 rows; a pasted block is limited to 1,000,000 characters.
+5. Review the count, then **Save N records**. The batch adds all records together and never overwrites existing records. Invalid rows block the save; they are not silently skipped. Unapplied pasted text must be added to the table or cleared before saving. Fields wait for the save to finish, and failed saves retain the entries. After a successful save, the table is empty and the current defaults remain ready for another batch. **Undo** reverses the whole saved batch during the session.
+
+**Back to records** keeps unfinished rows, defaults and unapplied paste in this tab. Navigation/refresh can recover them through **Continue: Quick entry** in the header's unfinished-edit list. **Discard unfinished batch** clears that draft after confirmation. Backups include saved records only. On smaller screens, scroll within the table to reach additional columns and row actions.
+
 ## Assign a class
 
 1. Select the academic term in the top bar.

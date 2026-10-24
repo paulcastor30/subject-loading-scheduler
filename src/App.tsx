@@ -349,7 +349,7 @@ export default function App() {
                       Getting started
                     </button>
                   </div>
-                  {settingsTab === "records" && (
+                  {settingsTab === "records" && route.record !== "quick" && (
                     <SemesterGuide
                       data={data}
                       term={term}
@@ -363,7 +363,12 @@ export default function App() {
                       data={data}
                       commit={commit}
                       initialRecordId={route.record}
-                      onEntityChange={(entity) => navigate("settings", entity)}
+                      onEntityChange={(entity, record) =>
+                        navigate(
+                          "settings",
+                          `${entity}${record ? `?record=${record}` : ""}`,
+                        )
+                      }
                       initialEntity={
                         entities.includes(route.mode as Entity)
                           ? (route.mode as Entity)

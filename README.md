@@ -39,6 +39,8 @@ The browser tests run against the **production** build on port 4173. Run `pnpm b
 
 ## Faster everyday workflow
 
+**Quick entry** is available beside **Add record** for Faculty, Subjects and Rooms. Enter several rows in a table, set common curriculum/load-limit/building values once, and override individual cells as needed. Enter continues on the next row; Duplicate and Remove act on unfinished rows. Expand **Paste rows from Excel or a list** to append tab-separated cells or a faculty-name list. **Save N records** saves the entire valid batch together with session Undo; duplicates and missing details are shown beside their fields. Drafts recover through the header's unfinished-edit list. Single-record forms remain available.
+
 **Manual entry** starts with **Your next step** on Overview. Follow direct actions to add faculty, rooms, subjects and student sections. Records screens show the next task as prerequisites become available. **Save and add another** opens a fresh record and retains the program/curriculum context; optional details remain expandable. Fields are protected while saving, and failed saves retain your entries.
 
 **Add classes** lets you choose a student section and select several subjects in one save. Search by code/title, select visible subjects, and review the total selection count. Existing classes are marked and cannot be added twice; subjects are limited to the section's program. Unfinished selections stay in this tab, including recovery of earlier single-class drafts. After adding classes, the first class opens for instructor and meeting assignment. The class list distinguishes missing instructors from missing meeting times, and **Your next step** returns to the next unfinished class.
@@ -170,7 +172,7 @@ e2e/                 Production browser workflows
 
 ## Verification and boundaries
 
-[Local verification results](docs/VERIFICATION.md): 105 unit/component tests and 13 production browser tests passed; TypeScript, ESLint, and the production build passed.
+[Local verification results](docs/VERIFICATION.md): 126 unit/component tests and 14 production browser tests passed; TypeScript, ESLint, and the production build passed.
 
 Tests cover faculty/room/section conflicts, adjacency, containment, multiple meetings, different semesters, capacity, equipment/type, availability windows/blocks, load factors and limits, invalid references/duplicates, utilization, valid suggestions, CSV errors, preview imports, backup/restore, semester copying, IndexedDB reopen and stale writes, academic form creation, browser scheduling/editing/refresh, room search, reports, Excel import/export, and backup restoration. The README describes supported behavior rather than guaranteeing task completion times or WCAG certification.
 
