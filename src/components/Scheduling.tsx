@@ -1,6 +1,7 @@
 import { timetableLayout } from "../lib/timetable";
 import { useDraft } from "../lib/drafts";
 import { GroupWorkspace } from "./GroupWorkspace";
+import { AddClasses } from "./AddClasses";
 import {
   assignOfferingFaculty,
   meetingAssignment,
@@ -337,6 +338,7 @@ export function Scheduling({
     [bulkRoom, setBulkRoom] = useState(""),
     [bulkDay, setBulkDay] = useState("");
   const [fillUnassigned, setFillUnassigned] = useState(true);
+  const issues = useMemo(() => validate(data, term), [data, term]);
   useEffect(() => {
     if (meeting !== undefined || addingOffering)
       document
@@ -361,7 +363,13 @@ export function Scheduling({
             data.meetings.some(
               (m) => m.offeringId === o.id && m.roomId === room,
             )) &&
-          (!onlyUnassigned || !offeringComplete(data, o.id)) &&
+          (!onlyUnassigned ||
+            !offeringComplete(data, o.id) ||
+            issues.some(
+              (i) =>
+                i.offeringId === o.id &&
+                ["contact-hours", "missing-component"].includes(i.code),
+            )) &&
           offeringName(data, o.id).toLowerCase().includes(search.toLowerCase()),
       ),
     [
@@ -374,6 +382,7 @@ export function Scheduling({
       room,
       onlyUnassigned,
       search,
+      issues,
     ],
   );
   const ids = new Set(offerings.map((o) => o.id));
@@ -386,7 +395,6 @@ export function Scheduling({
   const activeOffering = data.offerings.find(
     (o) => o.id === offeringId && o.semesterId === term,
   );
-  const issues = useMemo(() => validate(data, term), [data, term]);
   async function assign(
     ids: string[],
     facultyId: string,
@@ -431,6 +439,23 @@ export function Scheduling({
     }
     return false;
   }
+  if (addingOffering)
+    return (
+      <section className="editor-panel">
+        <AddClasses
+          data={data}
+          term={term}
+          commit={commit}
+          onDone={(id) => {
+            setAddingOffering(false);
+            setOfferingId(id);
+            setMode("guided");
+            location.hash = `scheduling/guided?offering=${encodeURIComponent(id)}`;
+          }}
+          onCancel={() => setAddingOffering(false)}
+        />
+      </section>
+    );
   return (
     <>
       <div className="tabs" role="group" aria-label="Scheduling workflow">
@@ -452,7 +477,7 @@ export function Scheduling({
         ))}
       </div>
       <div className="toolbar wrap">
-        <Field label="Search offerings">
+        <Field label="Find a class">
           <input
             type="search"
             placeholder="Subject or section…"
@@ -511,13 +536,13 @@ export function Scheduling({
         <>
           <div className="split scheduling-split">
             <Panel
-              title={`Subject offerings (${offerings.length})`}
+              title={`Classes (${offerings.length})`}
               action={
                 <button
                   className="primary"
                   onClick={() => setAddingOffering(true)}
                 >
-                  + Add offering
+                  + Add classes
                 </button>
               }
             >
@@ -527,12 +552,16 @@ export function Scheduling({
                   checked={onlyUnassigned}
                   onChange={(e) => setOnlyUnassigned(e.target.checked)}
                 />
-                Unassigned only
+                Needs an instructor or meeting times
               </label>
               <div className="offering-list">
                 {offerings.map((o) => {
-                  const a = data.assignments.find((a) => a.offeringId === o.id),
-                    f = data.faculty.find((f) => f.id === a?.facultyId);
+                  const assigned = offeringComplete(data, o.id);
+                  const needsTimes = issues.some(
+                    (i) =>
+                      i.offeringId === o.id &&
+                      ["contact-hours", "missing-component"].includes(i.code),
+                  );
                   return (
                     <button
                       className={`offering-item ${o.id === offeringId ? "selected" : ""}`}
@@ -550,22 +579,18 @@ export function Scheduling({
                           }
                         </small>
                       </span>
-                      <Badge
-                        tone={offeringComplete(data, o.id) ? "green" : "amber"}
-                      >
-                        {offeringComplete(data, o.id)
-                          ? data.teachingGroups.some(
-                              (g) => g.offeringId === o.id,
-                            )
-                            ? "Groups assigned"
-                            : f?.name
-                          : "Needs faculty"}
+                      <Badge tone={assigned && !needsTimes ? "green" : "amber"}>
+                        {!assigned
+                          ? "Needs instructor"
+                          : needsTimes
+                            ? "Needs meeting times"
+                            : "Ready"}
                       </Badge>
                     </button>
                   );
                 })}
                 {!offerings.length && (
-                  <Empty title="No offerings found">
+                  <Empty title="No classes found">
                     {term ? (
                       <>
                         Add a subject and student section for this semester.{" "}
@@ -632,7 +657,7 @@ export function Scheduling({
                   commit={commit}
                 />
               ) : (
-                <Empty title="Select an offering">
+                <Empty title="Choose a class">
                   Choose a subject and section on the left to assign faculty and
                   schedule classes.
                 </Empty>
@@ -910,42 +935,6 @@ export function Scheduling({
             Need another room or time? Use Find a suitable schedule in Guided
             assignment. Blocking errors appear at the top of the page.
           </p>
-        </section>
-      )}
-      {addingOffering && (
-        <section className="editor-panel">
-          <RecordForm
-            draftKey={`new-offering:${term}`}
-            draftHref={`#scheduling/new?term=${encodeURIComponent(term)}`}
-            data={data}
-            entity="offerings"
-            initial={{
-              id: uid(),
-              semesterId: term,
-              subjectId: "",
-              sectionId: "",
-            }}
-            onSave={async (row) => {
-              if (
-                await commit(
-                  {
-                    ...data,
-                    offerings: [
-                      ...data.offerings,
-                      row as unknown as Row<"offerings">,
-                    ],
-                  },
-                  "Added subject offering",
-                )
-              ) {
-                setAddingOffering(false);
-                setOfferingId(String(row.id));
-                return true;
-              }
-              return false;
-            }}
-            onCancel={() => setAddingOffering(false)}
-          />
         </section>
       )}
     </>

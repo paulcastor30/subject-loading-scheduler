@@ -4,6 +4,7 @@ import { readPreference, writePreference } from "./lib/preferences";
 import { Component, useEffect, useState, type ReactNode } from "react";
 import { useStore } from "./lib/useStore";
 import { Dashboard } from "./components/Dashboard";
+import { SemesterGuide } from "./components/SemesterGuide";
 import { Scheduling } from "./components/Scheduling";
 import { Rooms } from "./components/Rooms";
 import { Reports } from "./components/Reports";
@@ -348,6 +349,14 @@ export default function App() {
                       Getting started
                     </button>
                   </div>
+                  {settingsTab === "records" && (
+                    <SemesterGuide
+                      data={data}
+                      term={term}
+                      navigate={navigate}
+                      currentEntity={route.mode || "faculty"}
+                    />
+                  )}
                   {settingsTab === "records" && (
                     <Records
                       key={`${route.mode}-${route.record}`}

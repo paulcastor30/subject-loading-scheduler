@@ -1823,6 +1823,145 @@ td .meter {
 .saved-class-summary {
   padding: 8px 0;
 }
+.semester-guide {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(260px, 1fr);
+  gap: 28px;
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid #b8cec0;
+  border-radius: 12px;
+  background: #f0f7f2;
+}
+.semester-guide h2 {
+  font-size: 24px;
+  margin: 8px 0;
+}
+.semester-guide p {
+  max-width: 60ch;
+}
+.semester-guide.compact-guide {
+  display: block;
+  padding: 16px 20px;
+}
+.compact-guide h2 {
+  font-size: 18px;
+}
+.compact-guide .eyebrow {
+  margin-top: 0;
+}
+.semester-guide .primary {
+  margin-top: 12px;
+  white-space: normal;
+}
+.semester-guide ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.semester-guide li button {
+  width: 100%;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  background: transparent;
+  border-color: transparent;
+  text-align: left;
+  white-space: normal;
+}
+.semester-guide li button[aria-current="step"] {
+  background: white;
+  border-color: #b8cec0;
+}
+.semester-guide li small {
+  margin-left: auto;
+  font-weight: 400;
+  flex-shrink: 0;
+}
+.record-context {
+  padding: 10px 14px;
+  background: #edf4ef;
+  border-radius: 6px;
+}
+.record-context p {
+  margin: 4px 0;
+}
+.record-form-fields {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.add-classes {
+  padding: 22px;
+}
+.class-selection-fields {
+  border: 0;
+  padding: 0;
+  margin: 18px 0;
+  min-width: 0;
+}
+.class-selection-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin: 16px 0;
+}
+.subject-choices {
+  max-height: 420px;
+  overflow-y: auto;
+  border: 1px solid #d4dfd8;
+  border-radius: 8px;
+}
+.subject-choices:empty {
+  display: none;
+}
+.subject-choice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border-bottom: 1px solid #d4dfd8;
+  cursor: pointer;
+}
+.subject-choice:last-child {
+  border-bottom: 0;
+}
+.subject-choice span {
+  min-width: 0;
+  flex: 1;
+}
+.subject-choice strong {
+  overflow-wrap: anywhere;
+}
+.subject-choice span small {
+  display: block;
+  margin-top: 4px;
+}
+.subject-choice input {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+.subject-choice:has(input:checked) {
+  background: #edf4ef;
+}
+.subject-choice.already-added {
+  color: #65756c;
+  cursor: default;
+}
+.next-steps > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+@media (max-width: 1000px) {
+  .semester-guide {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    padding: 18px;
+  }
+}
 .saved-class-summary p {
   margin: 8px 0;
   font-size: 14px;

@@ -28,6 +28,119 @@ function groupCard(page: Page, name: string) {
     .filter({ has: page.getByRole("heading", { name, exact: true }) });
 }
 
+test("manual setup guides repeated entry, batch classes, scheduling and refresh", async ({
+  page,
+}) => {
+  await page.goto("#dashboard");
+  await page.getByLabel("Academic year", { exact: true }).fill("2026–2027");
+  await page.getByRole("button", { name: "Create semester workspace" }).click();
+  const nextStep = () => page.getByRole("region", { name: "Your next step" });
+  await nextStep()
+    .getByRole("button", { name: "Add faculty", exact: true })
+    .click();
+  await page.getByLabel("Name", { exact: true }).fill("Casey Manual");
+  await page.getByRole("button", { name: "Save and add another" }).click();
+  await expect(page.getByLabel("Name", { exact: true })).toHaveValue("");
+  await page.getByLabel("Name", { exact: true }).fill("Jordan Manual");
+  await page.getByRole("button", { name: "Save record", exact: true }).click();
+
+  await nextStep()
+    .getByRole("button", { name: "Add rooms", exact: true })
+    .click();
+  await page.getByLabel("Name", { exact: true }).fill("Main classroom");
+  await page.getByLabel("Code", { exact: true }).fill("ROOM 1");
+  await page.getByLabel("Building", { exact: true }).fill("Main building");
+  await page.getByLabel("Capacity", { exact: true }).fill("40");
+  await page.getByRole("button", { name: "Save record", exact: true }).click();
+
+  await nextStep()
+    .getByRole("button", { name: "Add subjects", exact: true })
+    .click();
+  await page.getByLabel("Name", { exact: true }).fill("Computing Fundamentals");
+  await page.getByLabel("Code", { exact: true }).fill("MAN 101");
+  await page.getByRole("button", { name: "Save and add another" }).click();
+  await page
+    .getByLabel("Name", { exact: true })
+    .fill("Professional Communication");
+  await page.getByLabel("Code", { exact: true }).fill("MAN 102");
+  await page.getByRole("button", { name: "Save record", exact: true }).click();
+
+  await nextStep()
+    .getByRole("button", { name: "Add sections", exact: true })
+    .click();
+  await page.getByLabel("Name", { exact: true }).fill("BSCA 1A");
+  await page.getByRole("button", { name: "Save record", exact: true }).click();
+  await nextStep()
+    .getByRole("button", { name: "Add classes", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Select visible subjects" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Assignment workspace", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Add 2 classes", exact: true }),
+  ).toBeEnabled();
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.screenshot({
+    path: "test-results/manual-classes-desktop.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 768, height: 1024 });
+  await page
+    .getByRole("button", { name: "Add 2 classes", exact: true })
+    .scrollIntoViewIfNeeded();
+  await expect(
+    page.getByRole("button", { name: "Add 2 classes", exact: true }),
+  ).toBeInViewport();
+  await page.screenshot({
+    path: "test-results/manual-classes-tablet.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page
+    .getByRole("button", { name: "Add 2 classes", exact: true })
+    .click();
+  const lecture = groupCard(page, "Lecture");
+  await lecture
+    .getByLabel("Faculty for this group")
+    .selectOption({ label: "Casey Manual · 0.00 / 18 units" });
+  await lecture
+    .getByLabel("Available room")
+    .selectOption({ label: "ROOM 1 · 40 seats" });
+  await lecture
+    .getByRole("button", { name: "Save assignment & meeting", exact: true })
+    .click();
+  await expect(
+    lecture.getByText("Monday 08:00–11:00", { exact: true }),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "Overview", exact: true }).click();
+  await nextStep()
+    .getByRole("button", { name: "Continue scheduling", exact: true })
+    .click();
+  await lecture
+    .getByLabel("Faculty for this group")
+    .selectOption({ label: "Casey Manual · 3.00 / 18 units" });
+  await lecture.getByLabel("Day", { exact: true }).selectOption("1");
+  await lecture
+    .getByLabel("Available room")
+    .selectOption({ label: "ROOM 1 · 40 seats" });
+  await lecture
+    .getByRole("button", { name: "Save assignment & meeting", exact: true })
+    .click();
+  await page.getByRole("link", { name: "Overview", exact: true }).click();
+  await expect(
+    nextStep().getByRole("button", { name: "Review and print reports" }),
+  ).toBeVisible();
+  await page.reload();
+  await expect(
+    nextStep().getByRole("button", { name: "Review and print reports" }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: "test-results/manual-overview-desktop.png",
+    fullPage: true,
+  });
+});
+
 test("academic workflow, persistence, room search, exports and backup restore", async ({
   page,
 }) => {
@@ -367,6 +480,9 @@ test("semester setup and selected Form 3 import with reviewed group credits", as
   await expect(page.getByLabel("Academic term", { exact: true })).toContainText(
     "2026–2027",
   );
+  await page
+    .getByText("All setup tasks and import options", { exact: true })
+    .click();
   await page.getByRole("button", { name: "Import previous loading" }).click();
   await page.getByLabel("Choose Form 3 workbook").setInputFiles({
     name: "example-form-3.xlsx",

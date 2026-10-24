@@ -9,6 +9,49 @@ import {
 } from "./engine";
 import { sampleData } from "../../tests/fixtures/academicData";
 import { checkData } from "./storage";
+import { enableGroups, splitLab } from "./loading";
+
+it("suggests simultaneous split lab sessions without allowing faculty or room collisions", () => {
+  let data = sampleData();
+  data.meetings = [];
+  data = enableGroups(data, "off1");
+  const labA = data.teachingGroups.find((g) => g.component === "lab")!;
+  data = splitLab(data, labA.id);
+  const labB = data.teachingGroups.find(
+    (g) => g.component === "lab" && g.id !== labA.id,
+  )!;
+  data.assignments.find((a) => a.groupId === labB.id)!.facultyId = "fac2";
+  data.rooms.push({ ...data.rooms[1], id: "lab2", code: "LAB 2" });
+  data.schedulingRules[0].days = [0];
+  data.schedulingRules[0].start = "08:00";
+  data.schedulingRules[0].end = "11:00";
+  data.meetings.push({
+    id: "lab-a",
+    offeringId: "off1",
+    groupId: labA.id,
+    component: "lab",
+    roomId: "room2",
+    day: 0,
+    start: "08:00",
+    end: "11:00",
+  });
+  checkData(data);
+  const options = suggestions(data, "off1", "lab", 180, labB.id);
+  expect(options).toEqual([
+    {
+      id: "suggestion",
+      offeringId: "off1",
+      groupId: labB.id,
+      component: "lab",
+      roomId: "lab2",
+      day: 0,
+      start: "08:00",
+      end: "11:00",
+    },
+  ]);
+  data.assignments.find((a) => a.groupId === labB.id)!.facultyId = "fac1";
+  expect(suggestions(data, "off1", "lab", 180, labB.id)).toEqual([]);
+});
 function collision() {
   const d = sampleData();
   d.assignments.push({ id: "a2", offeringId: "off2", facultyId: "fac1" });

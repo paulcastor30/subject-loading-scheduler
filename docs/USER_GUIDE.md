@@ -2,11 +2,17 @@
 
 ## Set up the semester
 
-Start on **Overview → Start a semester / draft**. This creates the academic year, semester, program and initial curriculum together. Then use the task buttons in **Settings & data → Academic records & rules**: Faculty, Subjects & sections, Rooms and Semesters. The full Record type picker and calculation rules remain under **Advanced records and department rules**. A curriculum belongs to a program; offerings must pair a subject and section in the same program.
+Start on **Overview** and follow **Your next step** to complete semester setup. This creates the academic year, semester, program and initial curriculum together. To create another semester, expand **All setup tasks and import options → Start a semester / draft**. Then use the task buttons in **Settings & data → Academic records & rules**: Faculty, Subjects & sections, Rooms and Semesters. The full Record type picker and calculation rules remain under **Advanced records and department rules**. A curriculum belongs to a program; offerings must pair a subject and section in the same program.
 
 A subject records **course units**, **lecture contact hours per week**, and **lab contact hours per week** separately. Review your department's workload factors before assigning faculty. New faculty load limits are editable.
 
 ## Start quickly
+
+For manual entry, follow **Your next step** on Overview: semester → faculty → rooms → subjects → student sections → classes → instructor and meeting assignments. The next-task action also appears on records screens once you have started each prerequisite. You can enter the rest of your roster or catalog before moving on; a check mark means the task has been started, not that every department record is complete.
+
+Use **Save and add another** to enter successive records without reopening the form. Program/curriculum and year-level context are retained; names, codes and record identities are fresh. **Save record** saves and closes the form. Fields are protected during a save and entries remain available after a failed save. Optional details, such as equipment and faculty specialization, are under **Optional details and record links**. When only one parent record is available, it is selected and explained for you; you can inspect it in that expandable area.
+
+In **Add classes**, choose a student section and tick the subjects it will take. Use **Select visible subjects** to select all search results. The selection count includes subjects selected before changing your search. Subjects already added to that section and semester are marked **Already added**. Only subjects in the section's program are shown, with curriculum labels to distinguish versions. **Add N classes** saves the selection together and opens the first class for scheduling. **Back to classes** keeps unfinished selections in this tab; **Discard selections** clears them.
 
 Use the **Get the semester ready** checklist on Overview. **Start a semester / draft** creates the year and term together. You can copy prior offerings and group structure without copying instructors or meetings. Use different draft names for hiring scenarios. Checklist items open the relevant records screen; **Import previous loading** opens the reviewed Form 3 importer.
 
@@ -14,7 +20,7 @@ Use the **Get the semester ready** checklist on Overview. **Start a semester / d
 
 1. Select the academic term in the top bar.
 2. Open **Loading & scheduling → Assign & schedule**, or use a class’s **Assign →** shortcut on Overview.
-3. Add a class for a subject and student section, or choose an existing class. If a prerequisite is missing, follow its creation link; unfinished academic forms remain in this tab.
+3. Use **Add classes** to choose a section and one or more subjects, or choose an existing class. If a prerequisite is missing, follow its creation link; unfinished academic forms remain in this tab.
 4. The app prepares lecture/lab components from subject contact hours. Choose **Faculty for this group**; review the resulting faculty load.
 5. Enter day, start/end and an **Available room**. Use **Suggest available times** or **Repeat on other days** when useful. Click **Save assignment & meeting** to save faculty, credits and bookings together. To assign without scheduling yet, uncheck **Add a weekly meeting** and click **Save assignment**.
 6. Completed components show compact summaries. Use **Edit assignment or meetings** to change one. Inside the expanded form, **Edit meeting** fills the existing meeting rather than creating a duplicate. Expand **Class size, hours and load-credit settings** for enrollment, contact hours, credit categories and sourced overrides. **Split, unassign or remove this group** contains the less frequent structural actions.

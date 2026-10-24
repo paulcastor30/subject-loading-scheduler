@@ -1,4 +1,5 @@
 import { SemesterSetup } from "./SemesterSetup";
+import { SemesterGuide } from "./SemesterGuide";
 import type { Commit } from "../lib/useStore";
 import { offeringComplete, teachingLoad } from "../lib/loading";
 import { useMemo, useState } from "react";
@@ -38,33 +39,22 @@ export function Dashboard({
   const unassigned = offerings.filter((o) => !offeringComplete(data, o.id));
   return (
     <>
-      <div className="welcome">
-        <div>
-          <p className="eyebrow">YOUR SEMESTER AT A GLANCE</p>
-          <h2>
-            {term ? "Continue preparing your semester" : "Set up your semester"}
-          </h2>
-          <p>
-            Prepare teaching loads, find the right rooms, and keep every class
-            in place.
-          </p>
-        </div>
-        <button
-          className="primary"
-          onClick={() =>
-            term ? navigate("scheduling", "new") : setShowSetup(true)
-          }
-        >
-          {term ? "+ Add subject offering" : "Start semester setup"}
-        </button>
-      </div>
+      <SemesterGuide
+        data={data}
+        term={term}
+        navigate={(page, mode) => {
+          if (page === "dashboard" && mode === "setup") setShowSetup(true);
+          else navigate(page, mode);
+        }}
+      />
       {!data.semesters.length && (
         <div className="alert warning">
           Start with the semester setup below, then add your academic records or
           import your previous loading. This workspace starts empty.
         </div>
       )}
-      <div className="next-steps no-print">
+      <details className="next-steps no-print">
+        <summary>All setup tasks and import options</summary>
         <div>
           <h2>Get the semester ready</h2>
           <p className="note">
@@ -147,7 +137,7 @@ export function Dashboard({
             </button>
           ))}
         </div>
-      </div>
+      </details>
       {(showSetup || !data.semesters.length) && (
         <SemesterSetup
           data={data}
@@ -166,19 +156,19 @@ export function Dashboard({
             "Department roster",
           ],
           [
-            "Subjects offered",
+            "Subjects this semester",
             new Set(offerings.map((o) => o.subjectId)).size,
             "Distinct subjects",
           ],
           [
-            "Class sections",
+            "Classes this semester",
             offerings.length,
-            `${new Set(offerings.map((o) => o.sectionId)).size} student blocks`,
+            `${new Set(offerings.map((o) => o.sectionId)).size} student sections`,
           ],
           [
-            "Assigned / unassigned",
+            "With / without instructors",
             `${assigned.length} / ${unassigned.length}`,
-            "Subject offerings",
+            "Faculty assignment status",
           ],
           [
             "Teaching-load units",
@@ -282,7 +272,7 @@ export function Dashboard({
             <Empty
               title={
                 offerings.length
-                  ? "All offerings have faculty"
+                  ? "All classes have instructors"
                   : "No offerings yet"
               }
             >

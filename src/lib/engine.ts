@@ -10,6 +10,20 @@ export const overlaps = (
   a: { start: string; end: string },
   b: { start: string; end: string },
 ) => a.start < b.end && b.start < a.end;
+function disjointLabGroups(
+  data: Data,
+  a: Pick<Row<"meetings">, "offeringId" | "groupId">,
+  b: Pick<Row<"meetings">, "offeringId" | "groupId">,
+) {
+  return (
+    a.offeringId === b.offeringId &&
+    !!a.groupId &&
+    !!b.groupId &&
+    a.groupId !== b.groupId &&
+    data.teachingGroups.find((g) => g.id === a.groupId)?.component === "lab" &&
+    data.teachingGroups.find((g) => g.id === b.groupId)?.component === "lab"
+  );
+}
 export type Issue = {
   severity: "error" | "warning";
   code: string;
@@ -356,18 +370,7 @@ export function validate(data: Data, semesterId?: string): Issue[] {
           `${room?.code} is already occupied. ${pair} Choose another room or time.`,
           m,
         );
-      if (
-        o.sectionId === other.sectionId &&
-        !(
-          o.id === other.id &&
-          m.groupId &&
-          n.groupId &&
-          m.groupId !== n.groupId &&
-          group?.component === "lab" &&
-          data.teachingGroups.find((g) => g.id === n.groupId)?.component ===
-            "lab"
-        )
-      )
+      if (o.sectionId === other.sectionId && !disjointLabGroups(data, m, n))
         add(
           "error",
           "section-overlap",
@@ -506,8 +509,9 @@ export function suggestions(
     (m) =>
       data.offerings.find((o) => o.id === m.offeringId)?.semesterId ===
         o.semesterId &&
-      (data.offerings.find((o) => o.id === m.offeringId)?.sectionId ===
-        o.sectionId ||
+      ((data.offerings.find((o) => o.id === m.offeringId)?.sectionId ===
+        o.sectionId &&
+        !disjointLabGroups(data, m, { offeringId, groupId })) ||
         (faculty && meetingAssignment(data, m)?.facultyId === faculty)),
   );
   for (const day of rule.days)

@@ -20,7 +20,14 @@ import {
   type ChangePlan,
   type RecordAction,
 } from "../lib/recordChanges";
+const fieldNames: Record<string, string> = {
+  maxLoad: "Teaching load limit",
+  lectureHours: "Lecture hours per week",
+  labHours: "Lab hours per week",
+  size: "Students in section",
+};
 const human = (s: string) =>
+  fieldNames[s] ??
   s
     .replace(/Id$/, "")
     .replace(/([A-Z])/g, " $1")
@@ -52,6 +59,12 @@ const defaults: Record<string, unknown> = {
   days: [0, 1, 2, 3, 4, 5],
 };
 const hints: Record<string, string> = {
+  curriculumId:
+    "The approved subject list for a program and curriculum version.",
+  programId: "The degree program this record belongs to.",
+  size: "Number of students in this section. Used to find rooms with enough seats.",
+  yearLevel: "Student year level, such as 1 for first year.",
+  capacity: "Maximum number of students who can use this room at once.",
   equipment:
     "Comma-separated equipment; subject requirements must match room equipment.",
   specialization: "Comma-separated subject keywords. Advisory only.",
@@ -94,14 +107,21 @@ export function RecordForm({
   onCancel,
   draftKey,
   draftHref,
+  allowAddAnother = false,
+  preset = {},
 }: {
   data: Data;
   entity: Entity;
   initial?: Record<string, unknown>;
-  onSave: (row: Record<string, unknown>) => Promise<boolean>;
+  onSave: (
+    row: Record<string, unknown>,
+    addAnother?: boolean,
+  ) => Promise<boolean>;
   onCancel: () => void;
   draftKey?: string;
   draftHref?: string;
+  allowAddAnother?: boolean;
+  preset?: Record<string, unknown>;
 }) {
   const fields = Object.keys(schemas[entity].shape).filter((f) => f !== "id");
   const draft = useDraft<Record<string, unknown>>(
@@ -118,7 +138,7 @@ export function RecordForm({
                 ? "warning"
                 : f === "kind" && entity === "roomAvailability"
                   ? "blocked"
-                  : (defaults[f] ?? ""),
+                  : (preset[f] ?? defaults[f] ?? ""),
           ]),
         );
       return Object.fromEntries(
@@ -179,210 +199,262 @@ export function RecordForm({
         )
       )
         return;
-      if (await onSave(result.data)) draft.clear();
+      const addAnother =
+        (e.nativeEvent as SubmitEvent).submitter instanceof HTMLButtonElement &&
+        ((e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement)
+          .value === "another";
+      if (await onSave(result.data, addAnother)) draft.clear();
+      else
+        setError(
+          "Your changes were not saved. Review the message above and try again. Your entries are still here.",
+        );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to save.");
     } finally {
       setSaving(false);
     }
   }
+  const optionalFields: Partial<Record<Entity, string[]>> = {
+    faculty: ["specialization", "rank", "status", "active"],
+    subjects: ["equipment"],
+    rooms: ["equipment", "active"],
+    sections: [],
+  };
+  const optional = optionalFields[entity] ?? [];
+  const automatic = fields.filter((field) => {
+    const target = refs[entity]?.[field];
+    return (
+      target && data[target].length === 1 && value[field] === data[target][0].id
+    );
+  });
+  const renderField = (field: string) => {
+    const target = refs[entity]?.[field];
+    const v = value[field];
+    if (target)
+      return (
+        <Reference
+          key={field}
+          data={data}
+          entity={target}
+          label={human(field)}
+          hint={hints[field]}
+          value={String(v ?? "")}
+          onChange={(v) => set(field, v || undefined)}
+          required={!["groupId", "loadCategoryId"].includes(field)}
+        />
+      );
+    if (field === "days")
+      return (
+        <fieldset key={field}>
+          <legend>Scheduling days</legend>
+          {days.map((d, i) => (
+            <label className="check" key={d}>
+              <input
+                type="checkbox"
+                checked={(v as number[]).includes(i)}
+                onChange={(e) =>
+                  set(
+                    field,
+                    e.target.checked
+                      ? [...(v as number[]), i].sort()
+                      : (v as number[]).filter((n) => n !== i),
+                  )
+                }
+              />
+              {d}
+            </label>
+          ))}
+        </fieldset>
+      );
+    const options =
+      field === "status"
+        ? ["", "active", "studyLeave", "proposed"]
+        : field === "type"
+          ? ["classroom", "laboratory"]
+          : field === "component"
+            ? entity === "loadCategories"
+              ? ["lecture", "lab", "any"]
+              : ["lecture", "lab"]
+            : field === "kind"
+              ? entity === "loadActivities"
+                ? [
+                    "administration",
+                    "research",
+                    "extension",
+                    "advising",
+                    "supervision",
+                    "leave",
+                    "other",
+                  ]
+                : ["available", "blocked"]
+              : ["overload", "overloadPolicy"].includes(field)
+                ? field === "overloadPolicy"
+                  ? ["", "error", "warning"]
+                  : ["error", "warning"]
+                : field === "specialization" && entity === "schedulingRules"
+                  ? ["warning", "off"]
+                  : null;
+    return (
+      <Field key={field} label={human(field)} hint={hints[field]}>
+        {options ? (
+          <select
+            value={String(v)}
+            onChange={(e) =>
+              set(
+                field,
+                field === "overloadPolicy" && !e.target.value
+                  ? undefined
+                  : e.target.value,
+              )
+            }
+          >
+            {options.map((o) => (
+              <option key={o}>{o}</option>
+            ))}
+          </select>
+        ) : typeof v === "boolean" ? (
+          <input
+            type="checkbox"
+            checked={v}
+            onChange={(e) => set(field, e.target.checked)}
+          />
+        ) : field === "day" ? (
+          <select
+            value={Number(v)}
+            onChange={(e) => set(field, Number(e.target.value))}
+          >
+            {days.map((d, i) => (
+              <option key={d} value={i}>
+                {d}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <input
+            autoFocus={field === "name"}
+            type={
+              ["start", "end"].includes(field)
+                ? "time"
+                : numeric.includes(field)
+                  ? "number"
+                  : "text"
+            }
+            step={numeric.includes(field) ? "any" : undefined}
+            min={numeric.includes(field) ? 0 : undefined}
+            value={String(v ?? "")}
+            onChange={(e) =>
+              set(
+                field,
+                e.target.value === "" && field === "creditedLoad"
+                  ? undefined
+                  : e.target.value,
+              )
+            }
+            required={
+              ![
+                "equipment",
+                "specialization",
+                "reason",
+                "groupId",
+                "loadCategoryId",
+                "creditedLoad",
+                "creditReason",
+                "sourceNote",
+                "reference",
+                "rank",
+                "status",
+                "overloadPolicy",
+              ].includes(field)
+            }
+          />
+        )}
+      </Field>
+    );
+  };
   return (
     <form className="record-form" onSubmit={submit}>
       <h3>
         {initial ? "Edit" : "Add"} {labels[entity].toLowerCase()}
       </h3>
-      <ErrorMessage message={error} />
-      {draft.dirty && (
-        <p className="draft-note">
-          Unfinished edits kept in this tab. Save this form to update academic
-          records.
-        </p>
-      )}
-      {draft.storageError && (
-        <ErrorMessage message="This draft could not be kept in browser storage. Save before leaving the page." />
-      )}
-      {Object.entries(refs[entity] ?? {})
-        .filter(
-          ([field, target]) =>
-            !["groupId", "loadCategoryId"].includes(field) &&
-            !data[target].length,
-        )
-        .map(([, target]) => (
-          <p key={target} className="alert warning">
-            Add {labels[target].toLowerCase()} first.{" "}
-            <a href={`#settings/${target}?record=new`}>Add now →</a> Your
-            unfinished form will be kept in this tab.
+      <fieldset className="record-form-fields" disabled={saving}>
+        <ErrorMessage message={error} />
+        {draft.dirty && (
+          <p className="draft-note">
+            Unfinished edits kept in this tab. Save this form to update academic
+            records.
           </p>
-        ))}
-      <div className="form-grid">
-        {fields.map((field) => {
-          const target = refs[entity]?.[field];
-          const v = value[field];
-          if (target)
-            return (
-              <Reference
-                key={field}
-                data={data}
-                entity={target}
-                label={human(field)}
-                value={String(v ?? "")}
-                onChange={(v) => set(field, v || undefined)}
-                required={!["groupId", "loadCategoryId"].includes(field)}
-              />
-            );
-          if (field === "days")
-            return (
-              <fieldset key={field}>
-                <legend>Scheduling days</legend>
-                {days.map((d, i) => (
-                  <label className="check" key={d}>
-                    <input
-                      type="checkbox"
-                      checked={(v as number[]).includes(i)}
-                      onChange={(e) =>
-                        set(
-                          field,
-                          e.target.checked
-                            ? [...(v as number[]), i].sort()
-                            : (v as number[]).filter((n) => n !== i),
-                        )
-                      }
-                    />
-                    {d}
-                  </label>
-                ))}
-              </fieldset>
-            );
-          const options =
-            field === "status"
-              ? ["", "active", "studyLeave", "proposed"]
-              : field === "type"
-                ? ["classroom", "laboratory"]
-                : field === "component"
-                  ? entity === "loadCategories"
-                    ? ["lecture", "lab", "any"]
-                    : ["lecture", "lab"]
-                  : field === "kind"
-                    ? entity === "loadActivities"
-                      ? [
-                          "administration",
-                          "research",
-                          "extension",
-                          "advising",
-                          "supervision",
-                          "leave",
-                          "other",
-                        ]
-                      : ["available", "blocked"]
-                    : ["overload", "overloadPolicy"].includes(field)
-                      ? field === "overloadPolicy"
-                        ? ["", "error", "warning"]
-                        : ["error", "warning"]
-                      : field === "specialization" &&
-                          entity === "schedulingRules"
-                        ? ["warning", "off"]
-                        : null;
-          return (
-            <Field key={field} label={human(field)} hint={hints[field]}>
-              {options ? (
-                <select
-                  value={String(v)}
-                  onChange={(e) =>
-                    set(
-                      field,
-                      field === "overloadPolicy" && !e.target.value
-                        ? undefined
-                        : e.target.value,
-                    )
-                  }
-                >
-                  {options.map((o) => (
-                    <option key={o}>{o}</option>
-                  ))}
-                </select>
-              ) : typeof v === "boolean" ? (
-                <input
-                  type="checkbox"
-                  checked={v}
-                  onChange={(e) => set(field, e.target.checked)}
-                />
-              ) : field === "day" ? (
-                <select
-                  value={Number(v)}
-                  onChange={(e) => set(field, Number(e.target.value))}
-                >
-                  {days.map((d, i) => (
-                    <option key={d} value={i}>
-                      {d}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  type={
-                    ["start", "end"].includes(field)
-                      ? "time"
-                      : numeric.includes(field)
-                        ? "number"
-                        : "text"
-                  }
-                  step={numeric.includes(field) ? "any" : undefined}
-                  min={numeric.includes(field) ? 0 : undefined}
-                  value={String(v ?? "")}
-                  onChange={(e) =>
-                    set(
-                      field,
-                      e.target.value === "" && field === "creditedLoad"
-                        ? undefined
-                        : e.target.value,
-                    )
-                  }
-                  required={
-                    ![
-                      "equipment",
-                      "specialization",
-                      "reason",
-                      "building",
-                      "groupId",
-                      "loadCategoryId",
-                      "creditedLoad",
-                      "creditReason",
-                      "sourceNote",
-                      "reference",
-                      "rank",
-                      "status",
-                      "overloadPolicy",
-                    ].includes(field)
-                  }
-                />
-              )}
-            </Field>
-          );
-        })}
-      </div>
-      {entity === "workloadRules" && (
-        <p className="note">
-          These are the default credit factors. Separate teaching groups can
-          select a named category or record an explicit credit with its source.
-          Older whole-offering assignments use planned lecture hours × lecture
-          factor + planned lab hours × lab factor, once per offering. Other
-          duties are counted separately.
-        </p>
-      )}
-      <div className="actions">
-        <button className="primary" disabled={saving}>
-          {saving ? "Saving…" : "Save record"}
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            draft.clear();
-            onCancel();
-          }}
-        >
-          Cancel
-        </button>
-      </div>
+        )}
+        {draft.storageError && (
+          <ErrorMessage message="This draft could not be kept in browser storage. Save before leaving the page." />
+        )}
+        {Object.entries(refs[entity] ?? {})
+          .filter(
+            ([field, target]) =>
+              !["groupId", "loadCategoryId"].includes(field) &&
+              !data[target].length,
+          )
+          .map(([, target]) => (
+            <p key={target} className="alert warning">
+              Add {labels[target].toLowerCase()} first.{" "}
+              <a href={`#settings/${target}?record=new`}>Add now →</a> Your
+              unfinished form will be kept in this tab.
+            </p>
+          ))}
+        <div className="form-grid">
+          {fields
+            .filter((f) => !optional.includes(f) && !automatic.includes(f))
+            .map(renderField)}
+        </div>
+        {automatic.length > 0 && (
+          <div className="record-context">
+            {automatic.map((field) => (
+              <p key={field}>
+                {human(field)}:{" "}
+                {rowName(data, refs[entity]![field], String(value[field]))}{" "}
+                <small>(selected for you)</small>
+              </p>
+            ))}
+          </div>
+        )}
+        {(optional.length > 0 || automatic.length > 0) && (
+          <details className="class-advanced">
+            <summary>Optional details and record links</summary>
+            <div className="form-grid">
+              {fields
+                .filter((f) => optional.includes(f) || automatic.includes(f))
+                .map(renderField)}
+            </div>
+          </details>
+        )}
+        {entity === "workloadRules" && (
+          <p className="note">
+            These are the default credit factors. Separate teaching groups can
+            select a named category or record an explicit credit with its
+            source. Older whole-offering assignments use planned lecture hours ×
+            lecture factor + planned lab hours × lab factor, once per offering.
+            Other duties are counted separately.
+          </p>
+        )}
+        <div className="actions">
+          <button className="primary" disabled={saving}>
+            {saving ? "Saving…" : "Save record"}
+          </button>
+          {allowAddAnother && !initial && (
+            <button type="submit" value="another" disabled={saving}>
+              Save and add another
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              draft.clear();
+              onCancel();
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      </fieldset>
     </form>
   );
 }
@@ -417,6 +489,8 @@ export function Records({
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState(""),
     [error, setError] = useState("");
+  const [formSequence, setFormSequence] = useState(0);
+  const [preset, setPreset] = useState<Record<string, unknown>>({});
   const returnFocus = useRef<HTMLElement | null>(null);
   const singleton = ["workloadRules", "schedulingRules"].includes(entity);
   const fields = Object.keys(schemas[entity].shape).filter((f) => f !== "id");
@@ -434,6 +508,7 @@ export function Records({
     setPlan(null);
     setMessage("");
     setError("");
+    setPreset({});
     onEntityChange?.(next);
   }
   const tasks = [
@@ -449,7 +524,7 @@ export function Records({
     { name: "Semesters", items: ["semesters", "academicYears"] },
   ];
   const task = tasks.find((t) => t.items.includes(entity));
-  async function save(row: Record<string, unknown>) {
+  async function save(row: Record<string, unknown>, addAnother = false) {
     const next = structuredClone(data);
     const collection = next[entity] as unknown as Record<string, unknown>[];
     const index = collection.findIndex((r) => r.id === row.id);
@@ -461,7 +536,26 @@ export function Records({
         `${index < 0 ? "Added" : "Updated"} ${labels[entity].toLowerCase()}`,
       )
     ) {
-      setEditing(undefined);
+      if (addAnother) {
+        setPreset(
+          Object.fromEntries(
+            Object.entries(row).filter(([key]) =>
+              [
+                "curriculumId",
+                "programId",
+                "yearLevel",
+                "academicYearId",
+                "semesterId",
+              ].includes(key),
+            ),
+          ),
+        );
+        setEditing(null);
+        setFormSequence((n) => n + 1);
+        setMessage(
+          `Saved ${String(row.name ?? row.code ?? "record")}. Add the next record below.`,
+        );
+      } else setEditing(undefined);
       return true;
     }
     return false;
@@ -629,10 +723,12 @@ export function Records({
       )}
       {editing !== undefined && (
         <RecordForm
-          key={`${entity}-${editing?.id ?? "new"}`}
+          key={`${entity}-${editing?.id ?? "new"}-${formSequence}`}
           data={data}
           entity={entity}
           initial={editing ?? undefined}
+          allowAddAnother={!singleton}
+          preset={preset}
           onSave={save}
           onCancel={() => setEditing(undefined)}
         />

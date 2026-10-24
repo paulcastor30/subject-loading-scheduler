@@ -34,6 +34,7 @@ export function Select({
   options,
   empty = "Select…",
   required = false,
+  hint,
 }: {
   label: string;
   value: string;
@@ -41,6 +42,7 @@ export function Select({
   options: { id: string; name: string }[];
   empty?: string;
   required?: boolean;
+  hint?: string;
 }) {
   const [search, setSearch] = useState("");
   const id = useId();
@@ -59,6 +61,7 @@ export function Select({
         id={id}
         value={value}
         required={required}
+        aria-describedby={hint ? `${id}-hint` : undefined}
         onChange={(e) => onChange(e.target.value)}
       >
         <option value="">{empty}</option>
@@ -74,6 +77,7 @@ export function Select({
             </option>
           ))}
       </select>
+      {hint && <small id={`${id}-hint`}>{hint}</small>}
     </div>
   );
 }
@@ -91,6 +95,7 @@ export function Reference({
   onChange: (v: string) => void;
   required?: boolean;
   empty?: string;
+  hint?: string;
 }) {
   return (
     <Select

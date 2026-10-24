@@ -27,7 +27,7 @@ The browser tests run against the **production** build on port 4173. Run `pnpm b
 
 ## First use
 
-1. On **Overview**, choose **Start a semester / draft** to create your academic year, semester, program and initial curriculum. Use **Import previous loading** for a reviewed Form 3 workbook, or add your records in Settings.
+1. On **Overview**, follow **Your next step** and complete semester setup to create your academic year, semester, program and initial curriculum. To create another semester or import a Form 3 workbook, expand **All setup tasks and import options**.
 2. Add subjects (student course units, weekly lecture contact hours, weekly laboratory contact hours, equipment), faculty (specialization, load limit), student sections (program, year, class size), and rooms.
 3. Review **Workload rule** and **Scheduling rule**. Configure lecture/lab load factors, working days, opening/closing hours, and the severity of overload. Defaults are examples, not institutional policy.
 4. Select the semester in the header. In **Loading & scheduling**, add subject offerings linking subjects and student sections to that semester.
@@ -38,6 +38,10 @@ The browser tests run against the **production** build on port 4173. Run `pnpm b
 [Basic user guide](docs/USER_GUIDE.md) covers setup and daily workflows.
 
 ## Faster everyday workflow
+
+**Manual entry** starts with **Your next step** on Overview. Follow direct actions to add faculty, rooms, subjects and student sections. Records screens show the next task as prerequisites become available. **Save and add another** opens a fresh record and retains the program/curriculum context; optional details remain expandable. Fields are protected while saving, and failed saves retain your entries.
+
+**Add classes** lets you choose a student section and select several subjects in one save. Search by code/title, select visible subjects, and review the total selection count. Existing classes are marked and cannot be added twice; subjects are limited to the section's program. Unfinished selections stay in this tab, including recovery of earlier single-class drafts. After adding classes, the first class opens for instructor and meeting assignment. The class list distinguishes missing instructors from missing meeting times, and **Your next step** returns to the next unfinished class.
 
 **Overview** now provides a semester-start checklist, one-form term/draft creation, and **Import previous loading**. A new semester can copy offerings and group structure from an existing term without carrying forward its instructors or bookings. Use a distinct draft name for hiring alternatives; never import multiple alternative tabs into the same plan.
 
@@ -166,7 +170,7 @@ e2e/                 Production browser workflows
 
 ## Verification and boundaries
 
-[Local verification results](docs/VERIFICATION.md): 91 unit/component tests and 12 production browser tests passed; TypeScript, ESLint, and the production build passed.
+[Local verification results](docs/VERIFICATION.md): 105 unit/component tests and 13 production browser tests passed; TypeScript, ESLint, and the production build passed.
 
 Tests cover faculty/room/section conflicts, adjacency, containment, multiple meetings, different semesters, capacity, equipment/type, availability windows/blocks, load factors and limits, invalid references/duplicates, utilization, valid suggestions, CSV errors, preview imports, backup/restore, semester copying, IndexedDB reopen and stale writes, academic form creation, browser scheduling/editing/refresh, room search, reports, Excel import/export, and backup restoration. The README describes supported behavior rather than guaranteeing task completion times or WCAG certification.
 
